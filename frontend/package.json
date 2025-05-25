@@ -12,10 +12,10 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.6.5",
     "http-status": "^1.7.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "react-router-dom": "^6.21.1",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
     "socket.io-client": "^4.7.3",
     "web-vitals": "^2.1.4"
   },
@@ -42,5 +42,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-private-property-in-object": "^7.27.1"
   }
 }

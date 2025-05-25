@@ -1,8 +1,7 @@
-let IS_PROD = true;
-const server = IS_PROD ?
-    "https://apnacollegebackend.onrender.com" :
+const IS_PROD = false; // local development mode
 
-    "http://localhost:8000"
-
+const server = IS_PROD
+  ? "https://meetzybackend-ku9e.onrender.com" // production URL
+  : "http://localhost:8000"; // local server
 
 export default server;
