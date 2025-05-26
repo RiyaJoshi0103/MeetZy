@@ -1,4 +1,4 @@
-const IS_PROD = import.meta.env.MODE === "production";
+let IS_PROD = true;
 
 const server = IS_PROD
   ? "https://meetzy-backend1.onrender.com" // production URL
