@@ -1,252 +1,214 @@
 import React from "react";
-import { Link } from "react-router-dom"; // Import Link for routing
+import { Link } from "react-router-dom";
+import { Facebook, Twitter, Linkedin, Instagram, Mail } from "lucide-react";
 
 const Footer = () => {
-  const colors = {
-    primary: "#E67E22",
-    secondary: "#D35400",
-    textLight: "#FFFFFF",
-    textDark: "#2C3E50",
-    background: "#FDF2E9",
-  };
-
   return (
-    <>
-      <style>{`
-        .footer {
-          background-color: ${colors.primary};
-          color: ${colors.textLight};
-          padding: 3rem 2rem 2rem;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          width: 100%;
-        }
-
-        .footer-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 2rem;
-          text-align: left;
-        }
-
-        .footer-column h3 {
-          font-size: 1.2rem;
-          margin-bottom: 1.5rem;
-          position: relative;
-          padding-bottom: 0.5rem;
-        }
-
-        .footer-column h3::after {
-          content: '';
-          position: absolute;
-          left: 0;
-          bottom: 0;
-          width: 40px;
-          height: 2px;
-          background: ${colors.textLight};
-        }
-
-        .footer-links {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
-
-        .footer-links li {
-          margin-bottom: 0.8rem;
-        }
-
-        .footer-links a,
-        .footer-links .nav-link {
-          color: ${colors.textLight};
-          text-decoration: none;
-          transition: all 0.3s ease;
-          display: inline-block;
-        }
-
-        .footer-links a:hover,
-        .footer-links .nav-link:hover {
-          color: ${colors.textDark};
-          transform: translateX(5px);
-        }
-
-        .social-links {
-          display: flex;
-          gap: 1rem;
-          margin-top: 1.5rem;
-        }
-
-        .social-links a {
-          color: ${colors.textLight};
-          font-size: 1.5rem;
-          transition: all 0.3s ease;
-        }
-
-        .social-links a:hover {
-          color: ${colors.textDark};
-          transform: translateY(-3px);
-        }
-
-        .footer-bottom {
-          text-align: center;
-          margin-top: 3rem;
-          padding-top: 1.5rem;
-          border-top: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .footer-bottom p {
-          margin: 0;
-          font-size: 0.9rem;
-        }
-
-        .footer-bottom a {
-          color: ${colors.textLight};
-          text-decoration: underline;
-          transition: all 0.3s ease;
-        }
-
-        .footer-bottom a:hover {
-          color: ${colors.textDark};
-        }
-      `}</style>
-
-      <footer className="footer">
-        <div className="footer-container">
-          <div className="footer-column">
-            <h3>Product</h3>
-            <ul className="footer-links">
+    <footer className="bg-gradient-to-r from-indigo-700 via-purple-700 to-blue-800 text-white py-8 lg:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Main Footer Content */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+          {/* Product Column */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold relative pb-3 after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-10 after:h-0.5 after:bg-white">
+              Product
+            </h3>
+            <ul className="space-y-2">
               <li>
-                <Link className="nav-link" to="/features">
+                <Link
+                  to="/features"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Features
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/download">
+                <Link
+                  to="/download"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Download
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/integrations">
+                <Link
+                  to="/integrations"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Integrations
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/pricing">
+                <Link
+                  to="/pricing"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Pricing
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div className="footer-column">
-            <h3>Resources</h3>
-            <ul className="footer-links">
+          {/* Resources Column */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold relative pb-3 after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-10 after:h-0.5 after:bg-white">
+              Resources
+            </h3>
+            <ul className="space-y-2">
               <li>
-                <Link className="nav-link" to="/blog">
+                <Link
+                  to="/blog"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Blog
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/webinars">
+                <Link
+                  to="/webinars"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Webinars
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/tutorials">
+                <Link
+                  to="/tutorials"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Tutorials
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/support">
+                <Link
+                  to="/support"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Support
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div className="footer-column">
-            <h3>Company</h3>
-            <ul className="footer-links">
+          {/* Company Column */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold relative pb-3 after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-10 after:h-0.5 after:bg-white">
+              Company
+            </h3>
+            <ul className="space-y-2">
               <li>
-                <Link className="nav-link" to="/about">
+                <Link
+                  to="/about"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   About Us
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/careers">
+                <Link
+                  to="/careers"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Careers
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/press">
+                <Link
+                  to="/press"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Press
                 </Link>
               </li>
               <li>
-                <Link className="nav-link" to="/contact">
+                <Link
+                  to="/contact"
+                  className="text-white/80 hover:text-white transition-all duration-300 hover:translate-x-1 block text-sm">
                   Contact
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div className="footer-column">
-            <h3>Connect</h3>
-            <div className="social-links">
+          {/* Connect Column */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold relative pb-3 after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-10 after:h-0.5 after:bg-white">
+              Connect
+            </h3>
+
+            {/* Social Links */}
+            <div className="flex space-x-4">
               <a
                 href="https://facebook.com"
                 target="_blank"
-                rel="noopener noreferrer">
-                <i className="fab fa-facebook"></i>
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center transition-all duration-300 hover:bg-white/20 hover:scale-110">
+                <Facebook className="w-4 h-4" />
               </a>
               <a
                 href="https://twitter.com"
                 target="_blank"
-                rel="noopener noreferrer">
-                <i className="fab fa-twitter"></i>
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center transition-all duration-300 hover:bg-white/20 hover:scale-110">
+                <Twitter className="w-4 h-4" />
               </a>
               <a
                 href="https://linkedin.com"
                 target="_blank"
-                rel="noopener noreferrer">
-                <i className="fab fa-linkedin"></i>
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center transition-all duration-300 hover:bg-white/20 hover:scale-110">
+                <Linkedin className="w-4 h-4" />
               </a>
               <a
                 href="https://instagram.com"
                 target="_blank"
-                rel="noopener noreferrer">
-                <i className="fab fa-instagram"></i>
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center transition-all duration-300 hover:bg-white/20 hover:scale-110">
+                <Instagram className="w-4 h-4" />
               </a>
             </div>
-            <p style={{ marginTop: "1.5rem" }}>
-              Email us:{" "}
-              <a href="mailto:support@meetzy.com">support@meetzy.com</a>
-            </p>
+
+            {/* Email Contact */}
+            <div className="flex items-center space-x-2 mt-4">
+              <Mail className="w-4 h-4 text-white/80" />
+              <a
+                href="mailto:support@meetzy.com"
+                className="text-white/80 hover:text-white transition-colors duration-300 text-sm">
+                support@meetzy.com
+              </a>
+            </div>
+
+            {/* Newsletter Signup - Black Button */}
+            <button className="w-full mt-4 px-4 py-2.5 bg-black text-white rounded-full font-semibold text-sm transition-all duration-300 hover:bg-gray-900 hover:scale-105 border-2 border-black">
+              Subscribe to Newsletter
+            </button>
           </div>
         </div>
 
-        <div className="footer-bottom">
-          <p>
-            © {new Date().getFullYear()} Meetzy. All rights reserved. |
-            <Link className="nav-link" to="/privacy">
-              {" "}
-              Privacy Policy
-            </Link>{" "}
-            |
-            <Link className="nav-link" to="/terms">
-              {" "}
-              Terms of Service
-            </Link>{" "}
-            |
-            <Link className="nav-link" to="/cookies">
-              {" "}
-              Cookie Policy
-            </Link>
-          </p>
+        {/* Footer Bottom */}
+        <div className="border-t border-white/20 mt-8 lg:mt-12 pt-6 lg:pt-8">
+          <div className="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
+            {/* Copyright */}
+            <p className="text-white/70 text-sm">
+              © {new Date().getFullYear()} Meetzy. All rights reserved.
+            </p>
+
+            {/* Legal Links */}
+            <div className="flex flex-wrap justify-center gap-4 lg:gap-6">
+              <Link
+                to="/privacy"
+                className="text-white/70 hover:text-white transition-colors duration-300 text-sm">
+                Privacy Policy
+              </Link>
+              <Link
+                to="/terms"
+                className="text-white/70 hover:text-white transition-colors duration-300 text-sm">
+                Terms of Service
+              </Link>
+              <Link
+                to="/cookies"
+                className="text-white/70 hover:text-white transition-colors duration-300 text-sm">
+                Cookie Policy
+              </Link>
+            </div>
+
+            {/* Additional Black Button */}
+            <button className="px-6 py-2 bg-black text-white rounded-full font-semibold text-sm transition-all duration-300 hover:bg-gray-900 hover:scale-105 border-2 border-black">
+              Get Help
+            </button>
+          </div>
         </div>
-      </footer>
-    </>
+      </div>
+    </footer>
   );
 };
 

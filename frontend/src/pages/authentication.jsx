@@ -11,8 +11,57 @@ import Typography from "@mui/material/Typography";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { AuthContext } from "../contexts/AuthContext";
 import Snackbar from "@mui/material/Snackbar";
+import Navbar from "../Navbar";
+import Footer from "../footer";
 
-const defaultTheme = createTheme();
+// Custom theme matching your blue-purple gradient
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: "#4f46e5", // Indigo
+      light: "#6366f1",
+      dark: "#4338ca",
+    },
+    secondary: {
+      main: "#7c3aed", // Purple
+    },
+    background: {
+      default: "#f8fafc",
+    },
+  },
+  typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 10,
+          textTransform: "none",
+          fontWeight: 600,
+          fontSize: "0.9rem",
+          padding: "10px 20px",
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 10,
+            fontSize: "0.9rem",
+            "&:hover fieldset": {
+              borderColor: "#4f46e5",
+            },
+            "&.Mui-focused fieldset": {
+              borderColor: "#4f46e5",
+            },
+          },
+        },
+      },
+    },
+  },
+});
 
 export default function Authentication() {
   const [username, setUsername] = React.useState("");
@@ -45,196 +94,257 @@ export default function Authentication() {
   };
 
   return (
-    <ThemeProvider theme={defaultTheme}>
-      <Grid container component="main" sx={{ height: "100vh" }}>
-        <CssBaseline />
+    <ThemeProvider theme={theme}>
+      <div className="min-h-screen">
+        {/* Header */}
+        <Navbar />
 
-        {/* Left side - image */}
-        <Grid
-          item
-          xs={false}
-          sm={4}
-          md={7}
-          sx={{
+        {/* Full Screen Background with Centered Form - Added top spacing */}
+        <div
+          className="min-h-screen pt-16" // Added padding top to create space below navbar
+          style={{
             backgroundImage:
-              "url(https://source.unsplash.com/random?wallpapers)",
-            backgroundRepeat: "no-repeat",
-            backgroundColor: (t) =>
-              t.palette.mode === "light"
-                ? t.palette.grey[50]
-                : t.palette.grey[900],
+              "linear-gradient(135deg, rgba(79, 70, 229, 0.9) 0%, rgba(124, 58, 237, 0.85) 50%, rgba(219, 39, 119, 0.8) 100%), url(https://images.unsplash.com/photo-1581276879432-15e50529f34b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80)",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: "brightness(0.85)",
-          }}
-        />
-
-        {/* Right side - form */}
-        <Grid
-          item
-          xs={12}
-          sm={8}
-          md={5}
-          component={Paper}
-          elevation={10}
-          square>
-          <Box
+            backgroundBlendMode: "overlay",
+          }}>
+          <Grid
+            container
             sx={{
-              my: 10,
-              mx: 6,
+              minHeight: "calc(100vh - 180px)", // Adjusted height to account for navbar + top padding
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
-              animation: "fadeIn 0.8s ease-in",
-              "@keyframes fadeIn": {
-                "0%": { opacity: 0, transform: "translateY(10px)" },
-                "100%": { opacity: 1, transform: "translateY(0)" },
-              },
+              justifyContent: "center",
             }}>
-            <Avatar
-              sx={{
-                m: 1,
-                bgcolor: "secondary.main",
-                boxShadow: "0 0 8px #D35400",
-              }}
-              aria-label="lock icon">
-              <LockOutlinedIcon />
-            </Avatar>
+            <CssBaseline />
 
-            <Typography
-              component="h1"
-              variant="h5"
-              sx={{ mb: 3, fontWeight: "600" }}>
-              {formState === 0 ? "Sign In to Meetzy" : "Create an Account"}
-            </Typography>
-
-            {/* Toggle buttons for Sign In / Sign Up */}
-            <Box
+            {/* Centered Authentication Form - Smaller Size */}
+            <Grid
+              item
+              xs={11}
+              sm={8}
+              md={5}
+              lg={3}
+              xl={2}
               sx={{
                 display: "flex",
-                gap: 2,
-                mb: 3,
-                borderRadius: 1,
-                backgroundColor: "#f0f0f0",
-                p: 0.5,
+                alignItems: "center",
+                justifyContent: "center",
+                py: 2,
               }}>
-              <Button
-                fullWidth
-                variant={formState === 0 ? "contained" : "text"}
-                color="primary"
-                onClick={() => {
-                  setFormState(0);
-                  setError("");
-                }}
+              <Paper
+                elevation={16}
                 sx={{
-                  fontWeight: "600",
-                  borderRadius: 2,
-                  textTransform: "none",
-                  boxShadow:
-                    formState === 0
-                      ? "0 4px 12px rgba(230,126,34,0.5)"
-                      : "none",
-                  transition: "all 0.3s ease",
-                }}>
-                Sign In
-              </Button>
-
-              <Button
-                fullWidth
-                variant={formState === 1 ? "contained" : "text"}
-                color="primary"
-                onClick={() => {
-                  setFormState(1);
-                  setError("");
-                }}
-                sx={{
-                  fontWeight: "600",
-                  borderRadius: 2,
-                  textTransform: "none",
-                  boxShadow:
-                    formState === 1
-                      ? "0 4px 12px rgba(230,126,34,0.5)"
-                      : "none",
-                  transition: "all 0.3s ease",
-                }}>
-                Sign Up
-              </Button>
-            </Box>
-
-            <Box component="form" noValidate sx={{ mt: 1, width: "100%" }}>
-              {formState === 1 && (
-                <TextField
-                  margin="normal"
-                  required
-                  fullWidth
-                  id="name"
-                  label="Full Name"
-                  name="name"
-                  value={name}
-                  autoComplete="name"
-                  autoFocus
-                  onChange={(e) => setName(e.target.value)}
-                />
-              )}
-
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                id="username"
-                label="Username"
-                name="username"
-                value={username}
-                autoComplete="username"
-                autoFocus={formState === 0}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                name="password"
-                label="Password"
-                type="password"
-                id="password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(e) => setPassword(e.target.value)}
-              />
-
-              {error && (
-                <Typography
-                  variant="body2"
-                  sx={{ color: "error.main", mt: 1, mb: 1, fontWeight: "500" }}>
-                  {error}
-                </Typography>
-              )}
-
-              <Button
-                type="button"
-                fullWidth
-                variant="contained"
-                sx={{
-                  mt: 3,
-                  mb: 2,
-                  background:
-                    "linear-gradient(45deg, #E67E22 30%, #D35400 90%)",
-                  boxShadow: "0 4px 15px rgba(230, 126, 34, 0.6)",
-                  fontWeight: "700",
-                  fontSize: "1.1rem",
-                  "&:hover": {
-                    background:
-                      "linear-gradient(45deg, #D35400 30%, #E67E22 90%)",
-                    boxShadow: "0 6px 20px rgba(211, 84, 0, 0.8)",
+                  width: "100%",
+                  maxWidth: 380,
+                  p: 3,
+                  borderRadius: 3,
+                  background: "rgba(255, 255, 255, 0.95)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  animation: "fadeInUp 0.8s ease-out",
+                  "@keyframes fadeInUp": {
+                    "0%": {
+                      opacity: 0,
+                      transform: "translateY(30px)",
+                    },
+                    "100%": {
+                      opacity: 1,
+                      transform: "translateY(0)",
+                    },
                   },
-                }}
-                onClick={handleAuth}>
-                {formState === 0 ? "Login" : "Register"}
-              </Button>
-            </Box>
-          </Box>
-        </Grid>
+                }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                  }}>
+                  {/* Smaller Avatar */}
+                  <Avatar
+                    sx={{
+                      m: 1,
+                      bgcolor: "primary.main",
+                      width: 50,
+                      height: 50,
+                      boxShadow: "0 6px 20px rgba(79, 70, 229, 0.3)",
+                    }}
+                    aria-label="lock icon">
+                    <LockOutlinedIcon fontSize="medium" />
+                  </Avatar>
+
+                  {/* Smaller Heading */}
+                  <Typography
+                    component="h1"
+                    variant="h5"
+                    sx={{
+                      mb: 2,
+                      fontWeight: 700,
+                      background:
+                        "linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%)",
+                      backgroundClip: "text",
+                      textFillColor: "transparent",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}>
+                    {formState === 0 ? "Welcome Back" : "Join Meetzy"}
+                  </Typography>
+
+                  {/* Toggle buttons - Smaller */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 1,
+                      mb: 3,
+                      borderRadius: 2,
+                      backgroundColor: "grey.50",
+                      p: 0.5,
+                      width: "100%",
+                    }}>
+                    <Button
+                      fullWidth
+                      variant={formState === 0 ? "contained" : "text"}
+                      onClick={() => {
+                        setFormState(0);
+                        setError("");
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        fontSize: "0.85rem",
+                        py: 1,
+                        boxShadow:
+                          formState === 0
+                            ? "0 2px 8px rgba(79, 70, 229, 0.3)"
+                            : "none",
+                        transition: "all 0.3s ease",
+                      }}>
+                      Sign In
+                    </Button>
+
+                    <Button
+                      fullWidth
+                      variant={formState === 1 ? "contained" : "text"}
+                      onClick={() => {
+                        setFormState(1);
+                        setError("");
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        fontSize: "0.85rem",
+                        py: 1,
+                        boxShadow:
+                          formState === 1
+                            ? "0 2px 8px rgba(124, 58, 237, 0.3)"
+                            : "none",
+                        transition: "all 0.3s ease",
+                      }}>
+                      Sign Up
+                    </Button>
+                  </Box>
+
+                  <Box
+                    component="form"
+                    noValidate
+                    sx={{ mt: 1, width: "100%" }}>
+                    {formState === 1 && (
+                      <TextField
+                        margin="dense"
+                        required
+                        fullWidth
+                        id="name"
+                        label="Full Name"
+                        name="name"
+                        value={name}
+                        autoComplete="name"
+                        autoFocus
+                        size="small"
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    )}
+
+                    <TextField
+                      margin="dense"
+                      required
+                      fullWidth
+                      id="username"
+                      label="Email Address"
+                      name="username"
+                      value={username}
+                      autoComplete="email"
+                      autoFocus={formState === 0}
+                      size="small"
+                      onChange={(e) => setUsername(e.target.value)}
+                    />
+
+                    <TextField
+                      margin="dense"
+                      required
+                      fullWidth
+                      name="password"
+                      label="Password"
+                      type="password"
+                      id="password"
+                      value={password}
+                      autoComplete="current-password"
+                      size="small"
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+
+                    {error && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: "error.main",
+                          mt: 1.5,
+                          mb: 1,
+                          fontWeight: 500,
+                          textAlign: "center",
+                          p: 1,
+                          fontSize: "0.8rem",
+                          backgroundColor: "rgba(211, 47, 47, 0.1)",
+                          borderRadius: 1,
+                        }}>
+                        {error}
+                      </Typography>
+                    )}
+
+                    {/* Smaller Button */}
+                    <Button
+                      type="button"
+                      fullWidth
+                      variant="contained"
+                      sx={{
+                        mt: 2,
+                        mb: 1,
+                        background:
+                          "linear-gradient(135deg, #000000 0%, #374151 100%)",
+                        boxShadow: "0 4px 15px rgba(0, 0, 0, 0.3)",
+                        fontWeight: 600,
+                        fontSize: "0.9rem",
+                        py: 1.2,
+                        "&:hover": {
+                          background:
+                            "linear-gradient(135deg, #374151 0%, #000000 100%)",
+                          boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4)",
+                          transform: "translateY(-1px)",
+                        },
+                        transition: "all 0.3s ease",
+                      }}
+                      onClick={handleAuth}>
+                      {formState === 0 ? "Sign In" : "Create Account"}
+                    </Button>
+                  </Box>
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
+        </div>
+
+        {/* Footer */}
+        <Footer />
 
         <Snackbar
           open={open}
@@ -243,7 +353,7 @@ export default function Authentication() {
           message={message}
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         />
-      </Grid>
+      </div>
     </ThemeProvider>
   );
 }

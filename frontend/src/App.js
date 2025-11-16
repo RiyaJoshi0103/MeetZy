@@ -14,8 +14,6 @@ function App() {
       <Router>
 
         <AuthProvider>
-
-
           <Routes>
 
             <Route path='/' element={<LandingPage />} />
