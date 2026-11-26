@@ -168,9 +168,49 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const generateMeetingNotes = async (meetingCode) => {
+        try {
+            let request = await client.post(`/notes/${meetingCode}/generate`);
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
+
+    const getMeetingNotes = async (meetingCode) => {
+        try {
+            let request = await client.get(`/notes/${meetingCode}`);
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
+
+    const updateActionItemStatus = async (meetingCode, taskId, status) => {
+        try {
+            let request = await client.patch(`/notes/${meetingCode}/task/${taskId}`, { status });
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
+
     const data = {
-        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin, handleLogout, getTranscript, deleteTranscript
-    }
+        userData,
+        setUserData,
+        addToUserHistory,
+        createMeeting,
+        getIceServers,
+        getHistoryOfUser,
+        handleRegister,
+        handleLogin,
+        handleLogout,
+        getTranscript,
+        deleteTranscript,
+        generateMeetingNotes,
+        getMeetingNotes,
+        updateActionItemStatus,
+    };
 
     return (
         <AuthContext.Provider value={data}>

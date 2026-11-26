@@ -8,12 +8,15 @@ import HomeIcon from "@mui/icons-material/Home";
 import HistoryIcon from "@mui/icons-material/History";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import { IconButton, Box, Grid, Paper, Container, Chip } from "@mui/material";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import { IconButton, Box, Grid, Paper, Container, Chip, Button } from "@mui/material";
+import MeetingNotesModal from "../components/MeetingNotesModal";
 
 export default function History() {
   const { getHistoryOfUser } = useContext(AuthContext);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMeetingNotes, setSelectedMeetingNotes] = useState(null);
   const routeTo = useNavigate();
 
   useEffect(() => {
@@ -232,19 +235,42 @@ export default function History() {
                     <Box
                       sx={{
                         mt: 2,
-                        pt: 2,
+                        pt: 1.5,
                         borderTop: "1px solid",
                         borderColor: "grey.200",
-                        textAlign: "center",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
                       }}>
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMeetingNotes(meeting.meetingCode);
+                        }}
+                        startIcon={<AutoAwesomeIcon sx={{ color: "#7c3aed", fontSize: 16 }} />}
+                        sx={{
+                          textTransform: "none",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          color: "#4f46e5",
+                          px: 1,
+                          py: 0.2,
+                          borderRadius: 1.5,
+                          "&:hover": { background: "rgba(99, 102, 241, 0.08)" },
+                        }}>
+                        AI Notes & Tasks
+                      </Button>
                       <Typography
                         variant="caption"
                         sx={{
-                          color: "#4f46e5",
-                          fontWeight: 600,
+                          color: "#6b7280",
+                          fontWeight: 500,
                           cursor: "pointer",
+                          "&:hover": { color: "#111827" },
                         }}>
-                        Click to join again
+                        Join &rarr;
                       </Typography>
                     </Box>
                   </CardContent>
@@ -300,6 +326,12 @@ export default function History() {
           </Paper>
         )}
       </Container>
+
+      <MeetingNotesModal
+        open={!!selectedMeetingNotes}
+        onClose={() => setSelectedMeetingNotes(null)}
+        meetingCode={selectedMeetingNotes}
+      />
     </div>
   );
 }

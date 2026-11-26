@@ -6,6 +6,11 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from notes_generator import (
+    TranscriptSegmentInput,
+    MeetingNotesResponse,
+    generate_meeting_notes,
+)
 
 load_dotenv()
 
@@ -100,6 +105,20 @@ def transcribe_chunk(payload: AudioChunkPayload):
         confidence=confidence,
         processed_at=time.time()
     )
+
+class GenerateNotesPayload(BaseModel):
+    meeting_code: str = Field(..., description="Unique meeting room code")
+    segments: list[TranscriptSegmentInput] = Field(default=[], description="List of ordered transcript segments")
+
+@app.post("/generate-notes", response_model=MeetingNotesResponse, status_code=status.HTTP_200_OK)
+def api_generate_notes(payload: GenerateNotesPayload):
+    if not payload.meeting_code:
+        raise HTTPException(status_code=400, detail="meeting_code is required")
+    try:
+        notes = generate_meeting_notes(payload.meeting_code.strip().upper(), payload.segments)
+        return notes
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate meeting notes: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

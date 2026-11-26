@@ -33,6 +33,8 @@ import ClosedCaptionOffIcon from "@mui/icons-material/ClosedCaptionOff";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DownloadIcon from "@mui/icons-material/Download";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import MeetingNotesModal from "../components/MeetingNotesModal";
 import server from "../environment";
 import { AuthContext } from "../contexts/AuthContext";
 
@@ -99,11 +101,13 @@ export default function VideoMeetComponent() {
   const [username, setUsername] = useState("");
   const [videos, setVideos] = useState([]);
 
-  // Phase 2 AI Transcription & Live Captions States
+  // Phase 2 & 3 AI Transcription & Meeting Notes States
   const [consentGiven, setConsentGiven] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [showCaptions, setShowCaptions] = useState(true);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [roomCode, setRoomCode] = useState(() => (window.location.pathname.split("/").filter(Boolean).pop() || "").toUpperCase());
   const [transcripts, setTranscripts] = useState([]);
   const [liveCaption, setLiveCaption] = useState(null);
 
@@ -368,7 +372,9 @@ export default function VideoMeetComponent() {
     socketRef.current.on("connect", () => {
       try {
         const clean = window.location.pathname.split("/").filter(Boolean).pop();
-        roomCodeRef.current = (clean || "").toUpperCase();
+        const code = (clean || "").toUpperCase();
+        roomCodeRef.current = code;
+        setRoomCode(code);
       } catch (e) {}
 
       socketRef.current.emit("join-call", window.location.href);
@@ -1606,6 +1612,13 @@ export default function VideoMeetComponent() {
               title={showCaptions ? "Turn Off Live Captions (CC)" : "Turn On Live Captions (CC)"}>
               {showCaptions ? <ClosedCaptionIcon /> : <ClosedCaptionOffIcon />}
             </IconButton>
+
+            <IconButton
+              onClick={() => setShowNotesModal(true)}
+              style={{ color: "#c084fc" }}
+              title="AI Meeting Notes & Action Items">
+              <AutoAwesomeIcon />
+            </IconButton>
           </div>
 
           {/* Local Video */}
@@ -1632,6 +1645,13 @@ export default function VideoMeetComponent() {
               </div>
             ))}
           </div>
+
+          <MeetingNotesModal
+            open={showNotesModal}
+            onClose={() => setShowNotesModal(false)}
+            meetingCode={roomCode || roomCodeRef.current}
+            socket={socketRef.current}
+          />
         </div>
       )}
     </div>

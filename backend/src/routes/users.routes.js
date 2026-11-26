@@ -12,6 +12,11 @@ import {
     deleteMeetingTranscript,
     getMeetingTranscript,
 } from "../controllers/transcript.controller.js";
+import {
+    generateMeetingNotes,
+    getMeetingNotes,
+    updateActionItemStatus,
+} from "../controllers/notes.controller.js";
 import { authLimiter, apiLimiter } from "../middlewares/rateLimiter.js";
 
 const router = Router();
@@ -34,5 +39,10 @@ router.route("/get_ice_servers").get(getIceServers);
 router.route("/transcript/:meetingCode")
     .get(getMeetingTranscript)
     .delete(deleteMeetingTranscript);
+
+// Structured AI Meeting Notes routes
+router.route("/notes/:meetingCode/generate").post(generateMeetingNotes);
+router.route("/notes/:meetingCode").get(getMeetingNotes);
+router.route("/notes/:meetingCode/task/:taskId").patch(updateActionItemStatus);
 
 export default router;

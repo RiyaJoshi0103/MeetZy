@@ -26,6 +26,7 @@ if (typeof process.loadEnvFile === "function") {
 const app = express();
 const server = createServer(app);
 const io = connectToSocket(server);
+app.set("io", io);
 
 
 app.set("port", (process.env.PORT || 8000))
