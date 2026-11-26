@@ -101,7 +101,7 @@ export default function VideoMeetComponent() {
   const [username, setUsername] = useState("");
   const [videos, setVideos] = useState([]);
 
-  // Phase 2 & 3 AI Transcription & Meeting Notes States
+  // Phase 2, 3, 4 & 5 States
   const [consentGiven, setConsentGiven] = useState(false);
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -110,6 +110,10 @@ export default function VideoMeetComponent() {
   const [roomCode, setRoomCode] = useState(() => (window.location.pathname.split("/").filter(Boolean).pop() || "").toUpperCase());
   const [transcripts, setTranscripts] = useState([]);
   const [liveCaption, setLiveCaption] = useState(null);
+  const [isHost, setIsHost] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderInstanceRef = useRef(null);
+  const recordedChunksRef = useRef([]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -381,6 +385,36 @@ export default function VideoMeetComponent() {
       socketIdRef.current = socketRef.current.id;
 
       socketRef.current.on("chat-message", addMessage);
+
+      // Phase 5 Host Role & Moderation Listeners
+      socketRef.current.on("room-info", (info) => {
+        setIsHost(socketRef.current.id === info.hostId);
+      });
+
+      socketRef.current.on("force-mute", (data) => {
+        setAudio(false);
+        if (localStreamRef.current) {
+          localStreamRef.current.getAudioTracks().forEach((track) => {
+            track.enabled = false;
+          });
+        }
+        alert(`${data.requestedBy || "The host"} muted your microphone.`);
+      });
+
+      socketRef.current.on("force-disable-camera", (data) => {
+        setVideo(false);
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach((track) => {
+            track.enabled = false;
+          });
+        }
+        alert(`${data.requestedBy || "The host"} turned off your camera.`);
+      });
+
+      socketRef.current.on("force-leave", (data) => {
+        alert(data.reason || "You were removed from the meeting by the host.");
+        window.location.href = "/home";
+      });
 
       // Real-time AI transcription listeners
       socketRef.current.on("transcript-update", (entry) => {
@@ -921,6 +955,59 @@ export default function VideoMeetComponent() {
     }
 
     window.location.href = "/";
+  };
+
+  // Phase 5 Meeting Recording
+  const handleToggleRecord = () => {
+    if (!isRecording) {
+      try {
+        const streamToRecord = localVideoref.current?.srcObject || localStreamRef.current;
+        if (!streamToRecord) {
+          alert("No active media stream found to record.");
+          return;
+        }
+
+        recordedChunksRef.current = [];
+        let recorder;
+        try {
+          recorder = new MediaRecorder(streamToRecord, { mimeType: "video/webm;codecs=vp8,opus" });
+        } catch (e) {
+          recorder = new MediaRecorder(streamToRecord);
+        }
+
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunksRef.current.push(event.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          if (recordedChunksRef.current.length > 0) {
+            const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Meetzy-${roomCodeRef.current || "meeting"}-recording.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }
+        };
+
+        recorder.start(1000);
+        mediaRecorderInstanceRef.current = recorder;
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Recording error:", err);
+        alert("Could not start recording: " + err.message);
+      }
+    } else {
+      if (mediaRecorderInstanceRef.current && mediaRecorderInstanceRef.current.state !== "inactive") {
+        mediaRecorderInstanceRef.current.stop();
+      }
+      setIsRecording(false);
+    }
   };
 
   return (
@@ -1703,7 +1790,40 @@ export default function VideoMeetComponent() {
               title="AI Meeting Notes & Action Items">
               <AutoAwesomeIcon />
             </IconButton>
+
+            <IconButton
+              onClick={handleToggleRecord}
+              style={{ color: isRecording ? "#ef4444" : "rgba(255,255,255,0.7)" }}
+              title={isRecording ? "Stop Meeting Recording (REC)" : "Record Meeting"}>
+              <FiberManualRecordIcon />
+            </IconButton>
           </div>
+
+          {/* Recording Live Indicator */}
+          {isRecording && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 16,
+                left: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                background: "rgba(239, 68, 68, 0.2)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                color: "#f87171",
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                backdropFilter: "blur(4px)",
+                zIndex: 10,
+              }}>
+              <FiberManualRecordIcon sx={{ fontSize: 14, color: "#ef4444" }} />
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1 }}>
+                RECORDING
+              </Typography>
+            </Box>
+          )}
 
           {/* Local Video */}
           <video
@@ -1716,7 +1836,7 @@ export default function VideoMeetComponent() {
           {/* Remote Videos */}
           <div className={styles.conferenceView}>
             {videos.map((v) => (
-              <div key={v.socketId}>
+              <div key={v.socketId} style={{ position: "relative", display: "inline-block" }}>
                 <video
                   data-socket={v.socketId}
                   ref={(ref) => {
@@ -1726,6 +1846,47 @@ export default function VideoMeetComponent() {
                   }}
                   autoPlay
                   playsInline></video>
+
+                {isHost && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      display: "flex",
+                      gap: 0.5,
+                      background: "rgba(15, 23, 42, 0.8)",
+                      p: 0.5,
+                      borderRadius: 2,
+                      backdropFilter: "blur(6px)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                    }}>
+                    <Tooltip title="Mute Participant Microphone">
+                      <IconButton
+                        size="small"
+                        onClick={() => socketRef.current?.emit("host-mute-user", v.socketId)}
+                        sx={{ color: "#ef4444", p: 0.4 }}>
+                        <MicOffIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Turn Off Participant Camera">
+                      <IconButton
+                        size="small"
+                        onClick={() => socketRef.current?.emit("host-disable-camera", v.socketId)}
+                        sx={{ color: "#f59e0b", p: 0.4 }}>
+                        <VideocamOffIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Kick Participant from Meeting">
+                      <IconButton
+                        size="small"
+                        onClick={() => socketRef.current?.emit("host-kick-user", v.socketId)}
+                        sx={{ color: "#ef4444", p: 0.4 }}>
+                        <CallEndIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                )}
               </div>
             ))}
           </div>

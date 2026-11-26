@@ -16,6 +16,20 @@ from rag_agent import (
     MeetingQAResponse,
     ask_meeting_agent,
 )
+from mcp_server import (
+    MCP_TOOLS,
+    MCPCallPayload,
+    MCPCallResponse,
+    JSONRPCRequest,
+    JSONRPCResponse,
+    execute_mcp_tool,
+    handle_jsonrpc,
+)
+from agentic_workflow import (
+    AgentRunPayload,
+    AgentRunResponse,
+    run_agentic_workflow,
+)
 
 load_dotenv()
 
@@ -134,6 +148,34 @@ def api_meeting_qa(payload: MeetingQAPayload):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process meeting Q&A: {str(e)}")
+
+# MCP (Model Context Protocol) Endpoints
+@app.get("/mcp/tools")
+def get_mcp_tools():
+    return {"tools": MCP_TOOLS}
+
+@app.post("/mcp/call", response_model=MCPCallResponse)
+def call_mcp_tool(payload: MCPCallPayload):
+    try:
+        res = execute_mcp_tool(payload.name, payload.arguments)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"MCP tool execution failed: {str(e)}")
+
+@app.post("/mcp", response_model=JSONRPCResponse)
+def jsonrpc_mcp(req: JSONRPCRequest):
+    return handle_jsonrpc(req)
+
+# LangGraph Agentic Workflow Endpoint
+@app.post("/agent/run", response_model=AgentRunResponse, status_code=status.HTTP_200_OK)
+def api_agent_run(payload: AgentRunPayload):
+    if not payload.meeting_code or not payload.instruction:
+        raise HTTPException(status_code=400, detail="meeting_code and instruction are required")
+    try:
+        res = run_agentic_workflow(payload)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent workflow execution failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

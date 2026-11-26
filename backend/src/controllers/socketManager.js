@@ -7,6 +7,7 @@ import { processMeetingQuery } from "./qa.controller.js";
 
 const connections = {};
 const timeOnline = {};
+const roomHosts = {};
 
 function extractRoomCode(path) {
     if (!path) return "";
@@ -97,6 +98,10 @@ export const connectToSocket = (server) => {
 
                 timeOnline[socket.id] = new Date();
 
+                if (!roomHosts[roomCode]) {
+                    roomHosts[roomCode] = socket.id;
+                }
+
                 // Notify all users in this room of the new participant
                 for (let a = 0; a < connections[roomCode].length; a++) {
                     io.to(connections[roomCode][a]).emit(
@@ -104,6 +109,10 @@ export const connectToSocket = (server) => {
                         socket.id,
                         connections[roomCode]
                     );
+                    io.to(connections[roomCode][a]).emit("room-info", {
+                        hostId: roomHosts[roomCode],
+                        meetingCode: roomCode,
+                    });
                 }
 
                 // Send past room chat messages to this participant
@@ -334,6 +343,63 @@ export const connectToSocket = (server) => {
             }
         });
 
+        // Host moderation: Remote Mute Participant Microphone
+        socket.on("host-mute-user", (targetSocketId) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) {
+                        return [roomKey, true];
+                    }
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+
+            if (found && matchingRoom && roomHosts[matchingRoom] === socket.id) {
+                io.to(targetSocketId).emit("force-mute", {
+                    requestedBy: socket.user?.username || "Meeting Host",
+                });
+            }
+        });
+
+        // Host moderation: Remote Disable Participant Camera
+        socket.on("host-disable-camera", (targetSocketId) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) {
+                        return [roomKey, true];
+                    }
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+
+            if (found && matchingRoom && roomHosts[matchingRoom] === socket.id) {
+                io.to(targetSocketId).emit("force-disable-camera", {
+                    requestedBy: socket.user?.username || "Meeting Host",
+                });
+            }
+        });
+
+        // Host moderation: Remove Participant from Meeting
+        socket.on("host-kick-user", (targetSocketId) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) {
+                        return [roomKey, true];
+                    }
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+
+            if (found && matchingRoom && roomHosts[matchingRoom] === socket.id) {
+                io.to(targetSocketId).emit("force-leave", {
+                    reason: `You were removed from meeting ${matchingRoom} by the host.`,
+                });
+            }
+        });
+
         socket.on("disconnect", () => {
             let key = null;
 
@@ -343,13 +409,25 @@ export const connectToSocket = (server) => {
                     key = k;
                     v.splice(index, 1);
 
-                    // Notify remaining users that participant left
+                    // Reassign host if current host departed
+                    if (roomHosts[key] === socket.id) {
+                        roomHosts[key] = v[0] || null;
+                    }
+
+                    // Notify remaining users that participant left & update host
                     for (let a = 0; a < v.length; ++a) {
                         io.to(v[a]).emit("user-left", socket.id);
+                        if (roomHosts[key]) {
+                            io.to(v[a]).emit("room-info", {
+                                hostId: roomHosts[key],
+                                meetingCode: key,
+                            });
+                        }
                     }
 
                     if (v.length === 0) {
                         delete connections[key];
+                        delete roomHosts[key];
                     }
                     break;
                 }
