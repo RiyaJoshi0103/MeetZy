@@ -3,6 +3,7 @@ import { User } from "../models/user.model.js";
 import { Meeting } from "../models/meeting.model.js";
 import { ChatMessage } from "../models/chat.model.js";
 import { Transcript } from "../models/transcript.model.js";
+import { processMeetingQuery } from "./qa.controller.js";
 
 const connections = {};
 const timeOnline = {};
@@ -179,6 +180,57 @@ export const connectToSocket = (server) => {
                             savedMessage.timestamp
                         );
                     });
+
+                    // Trigger in-meeting AI assistant if message is directed to @ai, @meetzy, or /ai
+                    const lower = cleanMessage.toLowerCase();
+                    if (
+                        lower.startsWith("@ai ") ||
+                        lower.startsWith("@meetzy ") ||
+                        lower.startsWith("/ai ") ||
+                        lower === "@ai" ||
+                        lower === "@meetzy"
+                    ) {
+                        (async () => {
+                            try {
+                                const query = cleanMessage
+                                    .replace(/^(@ai|@meetzy|\/ai)\s*/i, "")
+                                    .trim() || "What were the main topics and decisions discussed so far?";
+                                const aiResponse = await processMeetingQuery(matchingRoom, query, sender);
+                                
+                                let replyText = aiResponse.answer;
+                                if (aiResponse.citations && aiResponse.citations.length > 0) {
+                                    const citeTags = aiResponse.citations
+                                        .map((c) => (c.line_number ? `[Line ${c.line_number}]` : null))
+                                        .filter(Boolean)
+                                        .join(" ");
+                                    if (citeTags) {
+                                        replyText += `\n(Sources: ${citeTags})`;
+                                    }
+                                }
+
+                                const aiMessage = await ChatMessage.create({
+                                    meetingCode: matchingRoom,
+                                    sender: "Meetzy AI",
+                                    message: replyText,
+                                    timestamp: new Date(),
+                                });
+
+                                if (connections[matchingRoom]) {
+                                    connections[matchingRoom].forEach((elem) => {
+                                        io.to(elem).emit(
+                                            "chat-message",
+                                            aiMessage.message,
+                                            aiMessage.sender,
+                                            "meetzy-ai-agent",
+                                            aiMessage.timestamp
+                                        );
+                                    });
+                                }
+                            } catch (botErr) {
+                                console.error("Error running AI in-meeting agent:", botErr);
+                            }
+                        })();
+                    }
                 } catch (saveErr) {
                     console.error("Error persisting chat message:", saveErr);
                 }

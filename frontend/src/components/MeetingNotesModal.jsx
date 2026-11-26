@@ -15,6 +15,7 @@ import {
   Paper,
   Alert,
   Tooltip,
+  TextField,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -33,7 +34,7 @@ export default function MeetingNotesModal({
   meetingCode,
   socket = null,
 }) {
-  const { getMeetingNotes, generateMeetingNotes, updateActionItemStatus } =
+  const { getMeetingNotes, generateMeetingNotes, updateActionItemStatus, askMeetingAI } =
     useContext(AuthContext);
 
   const [notes, setNotes] = useState(null);
@@ -41,6 +42,9 @@ export default function MeetingNotesModal({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [updatingTask, setUpdatingTask] = useState({});
+  const [qaQuery, setQaQuery] = useState("");
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaAnswer, setQaAnswer] = useState(null);
 
   const fetchNotes = useCallback(async () => {
     if (!meetingCode) return;
@@ -123,6 +127,19 @@ export default function MeetingNotesModal({
       fetchNotes();
     } finally {
       setUpdatingTask((prev) => ({ ...prev, [taskId]: false }));
+    }
+  };
+
+  const handleAskAgent = async () => {
+    if (!qaQuery.trim() || !meetingCode) return;
+    setQaLoading(true);
+    try {
+      const res = await askMeetingAI(meetingCode, qaQuery.trim());
+      setQaAnswer(res);
+    } catch (err) {
+      console.error("QA query error:", err);
+    } finally {
+      setQaLoading(false);
     }
   };
 
@@ -514,6 +531,98 @@ export default function MeetingNotesModal({
                 <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
                   No open action items recorded.
                 </Typography>
+              )}
+            </Box>
+
+            <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.08)" }} />
+
+            {/* In-Meeting AI Q&A Assistant Section */}
+            <Box>
+              <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+                <AutoAwesomeIcon sx={{ color: "#a855f7", fontSize: 20 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#f8fafc" }}>
+                  Ask Meetzy AI Assistant
+                </Typography>
+              </Box>
+
+              <Box display="flex" gap={1}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={qaQuery}
+                  onChange={(e) => setQaQuery(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter" && qaQuery.trim()) {
+                      handleAskAgent();
+                    }
+                  }}
+                  placeholder="Ask a question about this meeting (e.g. What did Priya propose?)..."
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      background: "rgba(15, 23, 42, 0.6)",
+                      color: "white",
+                      borderRadius: 2,
+                      fontSize: "0.85rem",
+                      "& fieldset": { borderColor: "rgba(255, 255, 255, 0.15)" },
+                      "&:hover fieldset": { borderColor: "#a855f7" },
+                      "&.Mui-focused fieldset": { borderColor: "#a855f7" },
+                    },
+                    "& .MuiInputBase-input": {
+                      color: "white",
+                    },
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleAskAgent}
+                  disabled={qaLoading || !qaQuery.trim()}
+                  sx={{
+                    background: "linear-gradient(135deg, #6366f1, #a855f7)",
+                    borderRadius: 2,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    px: 2.5,
+                    whiteSpace: "nowrap",
+                  }}>
+                  {qaLoading ? <CircularProgress size={16} color="inherit" /> : "Ask"}
+                </Button>
+              </Box>
+
+              {qaAnswer && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    mt: 1.5,
+                    borderRadius: 2.5,
+                    background: "rgba(30, 27, 75, 0.7)",
+                    border: "1px solid rgba(168, 85, 247, 0.35)",
+                  }}>
+                  <Typography variant="body2" sx={{ color: "#f1f5f9", lineHeight: 1.5, mb: 1 }}>
+                    {qaAnswer.answer}
+                  </Typography>
+                  {qaAnswer.citations && qaAnswer.citations.length > 0 && (
+                    <Box display="flex" flexWrap="wrap" gap={0.8} alignItems="center">
+                      <Typography variant="caption" sx={{ color: "#a5b4fc", fontWeight: 600 }}>
+                        Sources:
+                      </Typography>
+                      {qaAnswer.citations.map((c, i) => (
+                        <Chip
+                          key={i}
+                          size="small"
+                          label={`${c.speaker ? `${c.speaker} ` : ""}${c.line_number ? `[Line ${c.line_number}]` : ""}`}
+                          sx={{
+                            height: 20,
+                            fontSize: "0.68rem",
+                            background: "rgba(168, 85, 247, 0.2)",
+                            color: "#d8b4fe",
+                            border: "1px solid rgba(168, 85, 247, 0.4)",
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Paper>
               )}
             </Box>
           </Box>

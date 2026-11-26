@@ -11,6 +11,11 @@ from notes_generator import (
     MeetingNotesResponse,
     generate_meeting_notes,
 )
+from rag_agent import (
+    MeetingQAPayload,
+    MeetingQAResponse,
+    ask_meeting_agent,
+)
 
 load_dotenv()
 
@@ -119,6 +124,16 @@ def api_generate_notes(payload: GenerateNotesPayload):
         return notes
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate meeting notes: {str(e)}")
+
+@app.post("/meeting-qa", response_model=MeetingQAResponse, status_code=status.HTTP_200_OK)
+def api_meeting_qa(payload: MeetingQAPayload):
+    if not payload.meeting_code or not payload.question:
+        raise HTTPException(status_code=400, detail="meeting_code and question are required")
+    try:
+        result = ask_meeting_agent(payload)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process meeting Q&A: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

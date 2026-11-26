@@ -17,6 +17,7 @@ import {
     getMeetingNotes,
     updateActionItemStatus,
 } from "../controllers/notes.controller.js";
+import { queryMeetingQA } from "../controllers/qa.controller.js";
 import { authLimiter, apiLimiter } from "../middlewares/rateLimiter.js";
 
 const router = Router();
@@ -44,5 +45,8 @@ router.route("/transcript/:meetingCode")
 router.route("/notes/:meetingCode/generate").post(generateMeetingNotes);
 router.route("/notes/:meetingCode").get(getMeetingNotes);
 router.route("/notes/:meetingCode/task/:taskId").patch(updateActionItemStatus);
+
+// In-Meeting RAG Q&A Assistant route
+router.route("/meeting/:meetingCode/qa").post(queryMeetingQA);
 
 export default router;

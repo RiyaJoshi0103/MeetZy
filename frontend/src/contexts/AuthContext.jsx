@@ -195,6 +195,15 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const askMeetingAI = async (meetingCode, question) => {
+        try {
+            let request = await client.post(`/meeting/${meetingCode}/qa`, { question });
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
+
     const data = {
         userData,
         setUserData,
@@ -210,6 +219,7 @@ export const AuthProvider = ({ children }) => {
         generateMeetingNotes,
         getMeetingNotes,
         updateActionItemStatus,
+        askMeetingAI,
     };
 
     return (

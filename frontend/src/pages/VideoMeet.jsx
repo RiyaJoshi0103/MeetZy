@@ -1438,33 +1438,71 @@ export default function VideoMeetComponent() {
                                 width: 28,
                                 height: 28,
                                 fontSize: "0.75rem",
-                                bgcolor: "primary.main",
+                                background:
+                                  item.sender === "Meetzy AI"
+                                    ? "linear-gradient(135deg, #6366f1, #a855f7)"
+                                    : "primary.main",
+                                boxShadow:
+                                  item.sender === "Meetzy AI"
+                                    ? "0 0 10px rgba(168, 85, 247, 0.6)"
+                                    : "none",
                               }}>
-                              {item.sender?.charAt(0)?.toUpperCase()}
+                              {item.sender === "Meetzy AI" ? (
+                                <AutoAwesomeIcon sx={{ fontSize: 16, color: "white" }} />
+                              ) : (
+                                item.sender?.charAt(0)?.toUpperCase()
+                              )}
                             </Avatar>
                           )}
 
                           <Paper
-                            elevation={2}
+                            elevation={item.sender === "Meetzy AI" ? 3 : 2}
                             sx={{
                               p: 1.5,
                               borderRadius: 3,
                               background:
-                                item.sender === username
+                                item.sender === "Meetzy AI"
+                                  ? "linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%)"
+                                  : item.sender === username
                                   ? "linear-gradient(135deg, #4f46e5, #7c3aed)"
                                   : "white",
                               color:
-                                item.sender === username ? "white" : "grey.800",
+                                item.sender === "Meetzy AI"
+                                  ? "#f8fafc"
+                                  : item.sender === username
+                                  ? "white"
+                                  : "grey.800",
                               border:
-                                item.sender === username
+                                item.sender === "Meetzy AI"
+                                  ? "1px solid rgba(168, 85, 247, 0.5)"
+                                  : item.sender === username
                                   ? "none"
                                   : "1px solid rgba(0, 0, 0, 0.1)",
                               maxWidth: "100%",
                               wordBreak: "break-word",
                             }}>
+                            {item.sender === "Meetzy AI" && (
+                              <Box display="flex" alignItems="center" gap={0.5} mb={0.5}>
+                                <Chip
+                                  label="Meetzy AI Agent"
+                                  size="small"
+                                  sx={{
+                                    height: 18,
+                                    fontSize: "0.65rem",
+                                    fontWeight: 700,
+                                    background: "rgba(168, 85, 247, 0.25)",
+                                    color: "#d8b4fe",
+                                    border: "1px solid rgba(168, 85, 247, 0.4)",
+                                  }}
+                                />
+                              </Box>
+                            )}
                             <Typography
                               variant="body2"
-                              sx={{ lineHeight: 1.4 }}>
+                              sx={{
+                                lineHeight: 1.45,
+                                whiteSpace: "pre-wrap",
+                              }}>
                               {item.data}
                             </Typography>
                           </Paper>
@@ -1508,13 +1546,59 @@ export default function VideoMeetComponent() {
                     borderColor: "grey.200",
                     background: "white",
                   }}>
+                  {/* Quick AI Mention Suggestion Pills */}
+                  <Box display="flex" gap={0.8} mb={1.2} flexWrap="wrap">
+                    <Chip
+                      icon={<AutoAwesomeIcon style={{ fontSize: 13, color: "#8b5cf6" }} />}
+                      label="@ai tasks?"
+                      size="small"
+                      onClick={() => setMessage("@ai what are our key action items?")}
+                      sx={{
+                        fontSize: "0.7rem",
+                        cursor: "pointer",
+                        background: "rgba(139, 92, 246, 0.08)",
+                        color: "#6d28d9",
+                        border: "1px solid rgba(139, 92, 246, 0.2)",
+                        "&:hover": { background: "rgba(139, 92, 246, 0.16)" },
+                      }}
+                    />
+                    <Chip
+                      icon={<AutoAwesomeIcon style={{ fontSize: 13, color: "#8b5cf6" }} />}
+                      label="@ai decisions?"
+                      size="small"
+                      onClick={() => setMessage("@ai what was decided so far?")}
+                      sx={{
+                        fontSize: "0.7rem",
+                        cursor: "pointer",
+                        background: "rgba(139, 92, 246, 0.08)",
+                        color: "#6d28d9",
+                        border: "1px solid rgba(139, 92, 246, 0.2)",
+                        "&:hover": { background: "rgba(139, 92, 246, 0.16)" },
+                      }}
+                    />
+                    <Chip
+                      icon={<AutoAwesomeIcon style={{ fontSize: 13, color: "#8b5cf6" }} />}
+                      label="@ai summary"
+                      size="small"
+                      onClick={() => setMessage("@ai summarize this meeting")}
+                      sx={{
+                        fontSize: "0.7rem",
+                        cursor: "pointer",
+                        background: "rgba(139, 92, 246, 0.08)",
+                        color: "#6d28d9",
+                        border: "1px solid rgba(139, 92, 246, 0.2)",
+                        "&:hover": { background: "rgba(139, 92, 246, 0.16)" },
+                      }}
+                    />
+                  </Box>
+
                   <Box display="flex" gap={1} alignItems="flex-end">
                     <TextField
                       fullWidth
                       size="small"
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Type your message..."
+                      placeholder="Type a message or @ai <question>..."
                       variant="outlined"
                       onKeyPress={(e) => {
                         if (e.key === "Enter" && message.trim()) {
