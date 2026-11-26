@@ -1,7 +1,7 @@
-let IS_PROD = true;
-
-const server = IS_PROD
-  ? "https://meetzy-backend1.onrender.com" // production URL
-  : "http://localhost:8000"; // local development
+const server =
+  process.env.REACT_APP_SERVER_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://meetzy-backend1.onrender.com"
+    : "http://localhost:8000");
 
 export default server;
