@@ -11,6 +11,26 @@ const client = axios.create({
     baseURL: `${server}/api/v1/users`
 })
 
+// Attach Bearer token in headers for all authenticated requests
+client.interceptors.request.use((config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// Auto-clean stale token on 401 Unauthorized
+client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem("token");
+        }
+        return Promise.reject(error);
+    }
+);
+
 
 export const AuthProvider = ({ children }) => {
 
@@ -81,9 +101,75 @@ export const AuthProvider = ({ children }) => {
         }
     }
 
+    const createMeeting = async (meetingCode) => {
+        try {
+            let request = await client.post("/create_meeting", {
+                token: localStorage.getItem("token"),
+                meeting_code: meetingCode
+            });
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    const getIceServers = async () => {
+        try {
+            let request = await client.get("/get_ice_servers");
+            if (request.data && Array.isArray(request.data.iceServers)) {
+                return request.data.iceServers;
+            }
+        } catch (e) {}
+
+        // Safe fallback including STUN and OpenRelay TURN
+        return [
+            {
+                urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                ],
+            },
+            {
+                urls: [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turn:openrelay.metered.ca:443?transport=tcp",
+                ],
+                username: "openrelayproject",
+                credential: "openrelayproject",
+            },
+        ];
+    }
+
+    const handleLogout = async () => {
+        try {
+            await client.post("/logout");
+        } catch (e) {}
+        localStorage.removeItem("token");
+        setUserData(null);
+        router("/auth");
+    };
+
+    const getTranscript = async (meetingCode) => {
+        try {
+            let request = await client.get(`/transcript/${meetingCode}`);
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
+
+    const deleteTranscript = async (meetingCode) => {
+        try {
+            let request = await client.delete(`/transcript/${meetingCode}`);
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
 
     const data = {
-        userData, setUserData, addToUserHistory, getHistoryOfUser, handleRegister, handleLogin
+        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin, handleLogout, getTranscript, deleteTranscript
     }
 
     return (

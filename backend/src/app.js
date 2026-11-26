@@ -36,21 +36,41 @@ app.use(express.urlencoded({ limit: "40kb", extended: true }));
 app.use("/api/v1/users", userRoutes);
 
 const start = async () => {
-    app.set("mongo_user")
-    const mongoUri = process.env.MONGO_URI;
+    let mongoUri = process.env.MONGO_URI;
+
     if (!mongoUri) {
-        throw new Error("MONGO_URI environment variable is not defined");
+        console.warn("[Database] MONGO_URI is not set in environment.");
+        console.log("[Database] Initializing in-memory MongoDB instance for local development...");
+        try {
+            const { MongoMemoryServer } = await import("mongodb-memory-server");
+            const fs = await import("fs");
+            const path = await import("path");
+            const dataDir = path.resolve("./.mongo_data");
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+            }
+
+            const mongod = await MongoMemoryServer.create({
+                instance: {
+                    dbPath: dataDir,
+                    storageEngine: "wiredTiger",
+                },
+            });
+            mongoUri = mongod.getUri();
+            console.log(`[Database] Persistent MongoDB active at: ${mongoUri}`);
+        } catch (e) {
+            console.error("[Database] Failed to launch MongoMemoryServer:", e.message);
+            throw new Error("MONGO_URI environment variable is required to start the server.");
+        }
     }
+
     const connectionDb = await mongoose.connect(mongoUri);
+    console.log(`[Database] MongoDB connected successfully: ${connectionDb.connection.host}`);
 
-    console.log(`MONGO Connected DB HOst: ${connectionDb.connection.host}`)
     server.listen(app.get("port"), () => {
-        console.log("LISTENIN ON PORT 8000")
+        console.log(`[Server] Meetzy Backend listening on port ${app.get("port")}`);
     });
-
-
-
-}
+};
 
 
 

@@ -9,7 +9,6 @@ import {
   Typography,
   Paper,
 } from "@mui/material";
-import RestoreIcon from "@mui/icons-material/Restore";
 import LogoutIcon from "@mui/icons-material/Logout";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
 import HistoryIcon from "@mui/icons-material/History";
@@ -18,17 +17,28 @@ import { AuthContext } from "../contexts/AuthContext";
 function HomeComponent() {
   let navigate = useNavigate();
   const [meetingCode, setMeetingCode] = useState("");
-  const { addToUserHistory } = useContext(AuthContext);
+  const { addToUserHistory, createMeeting, handleLogout } = useContext(AuthContext);
 
   let handleJoinVideoCall = async () => {
     if (!meetingCode.trim()) return;
-    await addToUserHistory(meetingCode);
-    navigate(`/${meetingCode}`);
+    const cleanCode = meetingCode.trim().toUpperCase();
+    try {
+      await addToUserHistory(cleanCode);
+    } catch (e) {
+      console.warn("Could not record to history:", e.message);
+    }
+    navigate(`/${cleanCode}`);
   };
 
-  const handleCreateNewMeeting = () => {
-    const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setMeetingCode(randomCode);
+  const handleCreateNewMeeting = async () => {
+    try {
+      const res = await createMeeting();
+      if (res && res.meetingCode) {
+        setMeetingCode(res.meetingCode);
+      }
+    } catch (err) {
+      console.error("Failed to create new meeting:", err);
+    }
   };
 
   return (
@@ -76,10 +86,7 @@ function HomeComponent() {
               </Typography>
 
               <Button
-                onClick={() => {
-                  localStorage.removeItem("token");
-                  navigate("/auth");
-                }}
+                onClick={handleLogout}
                 startIcon={<LogoutIcon />}
                 sx={{
                   color: "white",

@@ -114,7 +114,6 @@ export default function History() {
                   variant="h5"
                   component="h1"
                   sx={{
-                    color: "white",
                     fontWeight: 700,
                     background:
                       "linear-gradient(135deg, #fff 0%, #e0e7ff 100%)",
