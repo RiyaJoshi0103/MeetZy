@@ -1,9 +1,9 @@
 import { Server } from "socket.io";
 import { User } from "../models/user.model.js";
 import { Meeting } from "../models/meeting.model.js";
+import { ChatMessage } from "../models/chat.model.js";
 
 const connections = {};
-const messages = {};
 const timeOnline = {};
 
 function extractRoomCode(path) {
@@ -46,7 +46,11 @@ export const connectToSocket = (server) => {
 
             // Enforce token expiration
             if (user.tokenExpires && user.tokenExpires < new Date()) {
-                return next(new Error("Authentication error: Session token has expired. Please log in again."));
+                return next(
+                    new Error(
+                        "Authentication error: Session token has expired. Please log in again."
+                    )
+                );
             }
 
             // Attach authenticated user identity to socket
@@ -100,16 +104,23 @@ export const connectToSocket = (server) => {
                     );
                 }
 
-                // Send past room chat messages to this participant
-                if (messages[roomCode] !== undefined) {
-                    for (let a = 0; a < messages[roomCode].length; ++a) {
-                        io.to(socket.id).emit(
+                // Send past room chat messages from MongoDB to this newly joined participant
+                try {
+                    const pastMessages = await ChatMessage.find({ meetingCode: roomCode })
+                        .sort({ timestamp: 1 })
+                        .limit(100);
+
+                    pastMessages.forEach((msg) => {
+                        socket.emit(
                             "chat-message",
-                            messages[roomCode][a].data,
-                            messages[roomCode][a].sender,
-                            messages[roomCode][a]["socket-id-sender"]
+                            msg.message,
+                            msg.sender,
+                            null,
+                            msg.timestamp
                         );
-                    }
+                    });
+                } catch (dbErr) {
+                    console.error("Error retrieving past chat messages:", dbErr);
                 }
             } catch (err) {
                 socket.emit("join-error", { message: "Server error validating room" });
@@ -120,8 +131,10 @@ export const connectToSocket = (server) => {
             io.to(toId).emit("signal", socket.id, message);
         });
 
-        // Chat message uses verified socket.user.username - sender cannot be spoofed!
-        socket.on("chat-message", (data) => {
+        // Chat message: validated, verified sender, and persisted to MongoDB with 30-day TTL
+        socket.on("chat-message", async (data) => {
+            if (!data || typeof data !== "string" || !data.trim()) return;
+
             const [matchingRoom, found] = Object.entries(connections).reduce(
                 ([room, isFound], [roomKey, roomValue]) => {
                     if (!isFound && roomValue.includes(socket.id)) {
@@ -133,23 +146,30 @@ export const connectToSocket = (server) => {
             );
 
             if (found && matchingRoom) {
-                if (!messages[matchingRoom]) {
-                    messages[matchingRoom] = [];
-                }
-
-                // Verified sender username from authenticated socket session
                 const sender = socket.user?.username || "Anonymous";
+                const cleanMessage = data.trim();
 
-                messages[matchingRoom].push({
-                    sender: sender,
-                    data: data,
-                    "socket-id-sender": socket.id,
-                    timestamp: new Date(),
-                });
+                try {
+                    const savedMessage = await ChatMessage.create({
+                        meetingCode: matchingRoom,
+                        sender: sender,
+                        message: cleanMessage,
+                        timestamp: new Date(),
+                    });
 
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("chat-message", data, sender, socket.id);
-                });
+                    // Broadcast to all active sockets in this meeting room
+                    connections[matchingRoom].forEach((elem) => {
+                        io.to(elem).emit(
+                            "chat-message",
+                            savedMessage.message,
+                            savedMessage.sender,
+                            socket.id,
+                            savedMessage.timestamp
+                        );
+                    });
+                } catch (saveErr) {
+                    console.error("Error persisting chat message:", saveErr);
+                }
             }
         });
 

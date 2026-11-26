@@ -492,12 +492,16 @@ export default function VideoMeetComponent() {
     }
   };
 
-  const addMessage = (data, sender, socketIdSender) => {
+  const addMessage = (data, sender, socketIdSender, timestamp) => {
     setMessages((prevMessages) => [
       ...prevMessages,
-      { sender, data },
+      {
+        sender,
+        data,
+        timestamp: timestamp ? new Date(timestamp) : new Date(),
+      },
     ]);
-    if (socketIdSender !== socketIdRef.current) {
+    if (socketIdSender && socketIdSender !== socketIdRef.current) {
       setNewMessages((prevNewMessages) => prevNewMessages + 1);
     }
   };
@@ -862,7 +866,7 @@ export default function VideoMeetComponent() {
                             mt: 0.5,
                             fontSize: "0.7rem",
                           }}>
-                          {new Date().toLocaleTimeString([], {
+                          {(item.timestamp ? new Date(item.timestamp) : new Date()).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
