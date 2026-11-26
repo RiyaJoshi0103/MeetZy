@@ -8,6 +8,10 @@ import {
     logout,
     register,
 } from "../controllers/user.controller.js";
+import {
+    deleteMeetingTranscript,
+    getMeetingTranscript,
+} from "../controllers/transcript.controller.js";
 import { authLimiter, apiLimiter } from "../middlewares/rateLimiter.js";
 
 const router = Router();
@@ -25,5 +29,10 @@ router.route("/add_to_activity").post(addToHistory);
 router.route("/get_all_activity").get(getUserHistory);
 router.route("/create_meeting").post(createMeeting);
 router.route("/get_ice_servers").get(getIceServers);
+
+// Transcript routes (retrieve and privacy deletion)
+router.route("/transcript/:meetingCode")
+    .get(getMeetingTranscript)
+    .delete(deleteMeetingTranscript);
 
 export default router;

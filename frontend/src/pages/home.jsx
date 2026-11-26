@@ -9,7 +9,6 @@ import {
   Typography,
   Paper,
 } from "@mui/material";
-import RestoreIcon from "@mui/icons-material/Restore";
 import LogoutIcon from "@mui/icons-material/Logout";
 import VideoCallIcon from "@mui/icons-material/VideoCall";
 import HistoryIcon from "@mui/icons-material/History";
@@ -22,8 +21,13 @@ function HomeComponent() {
 
   let handleJoinVideoCall = async () => {
     if (!meetingCode.trim()) return;
-    await addToUserHistory(meetingCode.trim().toUpperCase());
-    navigate(`/${meetingCode.trim().toUpperCase()}`);
+    const cleanCode = meetingCode.trim().toUpperCase();
+    try {
+      await addToUserHistory(cleanCode);
+    } catch (e) {
+      console.warn("Could not record to history:", e.message);
+    }
+    navigate(`/${cleanCode}`);
   };
 
   const handleCreateNewMeeting = async () => {

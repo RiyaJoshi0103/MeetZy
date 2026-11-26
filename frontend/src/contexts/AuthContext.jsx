@@ -20,6 +20,17 @@ client.interceptors.request.use((config) => {
     return config;
 });
 
+// Auto-clean stale token on 401 Unauthorized
+client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem("token");
+        }
+        return Promise.reject(error);
+    }
+);
+
 
 export const AuthProvider = ({ children }) => {
 
@@ -139,9 +150,26 @@ export const AuthProvider = ({ children }) => {
         router("/auth");
     };
 
+    const getTranscript = async (meetingCode) => {
+        try {
+            let request = await client.get(`/transcript/${meetingCode}`);
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
+
+    const deleteTranscript = async (meetingCode) => {
+        try {
+            let request = await client.delete(`/transcript/${meetingCode}`);
+            return request.data;
+        } catch (e) {
+            throw e;
+        }
+    };
 
     const data = {
-        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin, handleLogout
+        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin, handleLogout, getTranscript, deleteTranscript
     }
 
     return (

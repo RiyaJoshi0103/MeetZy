@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import { User } from "../models/user.model.js";
 import { Meeting } from "../models/meeting.model.js";
 import { ChatMessage } from "../models/chat.model.js";
+import { Transcript } from "../models/transcript.model.js";
 
 const connections = {};
 const timeOnline = {};
@@ -104,7 +105,7 @@ export const connectToSocket = (server) => {
                     );
                 }
 
-                // Send past room chat messages from MongoDB to this newly joined participant
+                // Send past room chat messages to this participant
                 try {
                     const pastMessages = await ChatMessage.find({ meetingCode: roomCode })
                         .sort({ timestamp: 1 })
@@ -121,6 +122,17 @@ export const connectToSocket = (server) => {
                     });
                 } catch (dbErr) {
                     console.error("Error retrieving past chat messages:", dbErr);
+                }
+
+                // Send past room transcripts to this participant
+                try {
+                    const pastTranscripts = await Transcript.find({ meetingCode: roomCode })
+                        .sort({ startTime: 1, timestamp: 1 })
+                        .limit(200);
+
+                    socket.emit("transcript-history", pastTranscripts);
+                } catch (trErr) {
+                    console.error("Error retrieving past transcripts:", trErr);
                 }
             } catch (err) {
                 socket.emit("join-error", { message: "Server error validating room" });
@@ -170,6 +182,103 @@ export const connectToSocket = (server) => {
                 } catch (saveErr) {
                     console.error("Error persisting chat message:", saveErr);
                 }
+            }
+        });
+
+        // Audio chunk listener: processes chunk, transcribes via AI service, and stores speaker transcript
+        socket.on("audio-chunk", async (chunkData) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) {
+                        return [roomKey, true];
+                    }
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+
+            if (!found || !matchingRoom) return;
+
+            const speaker = socket.user?.username || "Anonymous";
+            let transcribedText = chunkData?.text || "";
+
+            const aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:8001";
+
+            // If audioBase64 was provided, forward to AI microservice
+            if (!transcribedText && chunkData?.audioBase64) {
+                try {
+                    const res = await fetch(`${aiServiceUrl}/transcribe`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            meeting_code: matchingRoom,
+                            speaker: speaker,
+                            audio_base64: chunkData.audioBase64,
+                            start_time: Number(chunkData.startTime || 0),
+                            end_time: Number(chunkData.endTime || 0),
+                        }),
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        transcribedText = data.text;
+                    }
+                } catch (err) {
+                    // Microservice offline fallback placeholder
+                    transcribedText = `[${speaker} speech: ${Number(chunkData.startTime || 0).toFixed(1)}s - ${Number(chunkData.endTime || 0).toFixed(1)}s]`;
+                }
+            }
+
+            if (transcribedText && transcribedText.trim()) {
+                try {
+                    const savedEntry = await Transcript.create({
+                        meetingCode: matchingRoom,
+                        speaker: speaker,
+                        text: transcribedText.trim(),
+                        startTime: Number(chunkData?.startTime || 0),
+                        endTime: Number(chunkData?.endTime || 0),
+                        timestamp: new Date(),
+                    });
+
+                    // Broadcast transcript line in real time to all room participants
+                    connections[matchingRoom].forEach((elem) => {
+                        io.to(elem).emit("transcript-update", {
+                            id: savedEntry._id,
+                            meetingCode: matchingRoom,
+                            speaker: savedEntry.speaker,
+                            text: savedEntry.text,
+                            startTime: savedEntry.startTime,
+                            endTime: savedEntry.endTime,
+                            timestamp: savedEntry.timestamp,
+                        });
+                    });
+                } catch (err) {
+                    console.error("Error saving transcript segment:", err);
+                }
+            }
+        });
+
+        // Clear meeting transcript (for privacy / GDPR deletion)
+        socket.on("transcript-clear", async () => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) {
+                        return [roomKey, true];
+                    }
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+
+            if (!found || !matchingRoom) return;
+
+            try {
+                await Transcript.deleteMany({ meetingCode: matchingRoom });
+                connections[matchingRoom].forEach((elem) => {
+                    io.to(elem).emit("transcript-cleared");
+                });
+            } catch (err) {
+                console.error("Error clearing transcript:", err);
             }
         });
 

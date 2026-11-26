@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { Meeting } from "../models/meeting.model.js";
 
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
-const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
+const USERNAME_REGEX = /^[a-zA-Z0-9_.@+-]{2,60}$/;
 const MEETING_CODE_REGEX = /^[a-zA-Z0-9.\-_]{3,30}$/;
 
 // Helper: Extract session token from Bearer header, custom header, body, or query
@@ -93,25 +93,24 @@ const login = async (req, res) => {
 const register = async (req, res) => {
     const { name, username, password } = req.body;
 
-    // Strict input validation
-    if (!name || typeof name !== "string" || name.trim().length < 2 || name.trim().length > 50) {
-        return res.status(httpStatus.BAD_REQUEST).json({ message: "Name must be between 2 and 50 characters" });
-    }
-
     if (!username || typeof username !== "string" || !USERNAME_REGEX.test(username.trim())) {
         return res.status(httpStatus.BAD_REQUEST).json({
-            message: "Username must be 3-30 characters and contain only letters, numbers, and underscores",
+            message: "Username or email must be at least 2 characters and contain valid characters",
         });
     }
 
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string" || password.length < 3) {
         return res.status(httpStatus.BAD_REQUEST).json({
-            message: "Password must be at least 6 characters long",
+            message: "Password must be at least 3 characters long",
         });
     }
+
+    const cleanUsername = username.trim().toLowerCase();
+    const displayName = (name && typeof name === "string" && name.trim().length >= 1)
+        ? name.trim()
+        : cleanUsername.split("@")[0];
 
     try {
-        const cleanUsername = username.trim().toLowerCase();
         const existingUser = await User.findOne({ username: cleanUsername });
         if (existingUser) {
             return res.status(httpStatus.CONFLICT).json({ message: "User already exists" });
@@ -120,14 +119,14 @@ const register = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = new User({
-            name: name.trim(),
+            name: displayName,
             username: cleanUsername,
             password: hashedPassword,
         });
 
         await newUser.save();
 
-        return res.status(httpStatus.CREATED).json({ message: "User Registered" });
+        return res.status(httpStatus.CREATED).json({ message: "User Registered Successfully" });
     } catch (e) {
         return res.status(500).json({ message: `Registration error: ${e.message}` });
     }
@@ -178,15 +177,21 @@ const addToHistory = async (req, res) => {
     }
 
     try {
-        const newMeeting = new Meeting({
-            user_id: session.user.username,
-            meetingCode: meeting_code.trim().toUpperCase(),
-            date: new Date(),
-        });
-
-        await newMeeting.save();
-        return res.status(httpStatus.CREATED).json({ message: "Added code to history" });
+        const cleanCode = meeting_code.trim().toUpperCase();
+        let existing = await Meeting.findOne({ meetingCode: cleanCode });
+        if (!existing) {
+            const newMeeting = new Meeting({
+                user_id: session.user.username,
+                meetingCode: cleanCode,
+                date: new Date(),
+            });
+            await newMeeting.save();
+        }
+        return res.status(httpStatus.OK).json({ message: "Added code to history" });
     } catch (e) {
+        if (e.code === 11000) {
+            return res.status(httpStatus.OK).json({ message: "Meeting already in history" });
+        }
         return res.status(500).json({ message: `Something went wrong: ${e.message}` });
     }
 };

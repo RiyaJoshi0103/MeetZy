@@ -9,6 +9,13 @@ import {
   Paper,
   Avatar,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
@@ -21,6 +28,11 @@ import StopScreenShareIcon from "@mui/icons-material/StopScreenShare";
 import ChatIcon from "@mui/icons-material/Chat";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
+import ClosedCaptionIcon from "@mui/icons-material/ClosedCaption";
+import ClosedCaptionOffIcon from "@mui/icons-material/ClosedCaptionOff";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DownloadIcon from "@mui/icons-material/Download";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import server from "../environment";
 import { AuthContext } from "../contexts/AuthContext";
 
@@ -49,12 +61,13 @@ const defaultIceServers = [
 ];
 
 export default function VideoMeetComponent() {
-  const { getIceServers } = useContext(AuthContext);
+  const { getIceServers, deleteTranscript } = useContext(AuthContext);
 
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
   const localVideoref = useRef(null);
   const messagesEndRef = useRef(null);
+  const transcriptsEndRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
   const isScreenSharingRef = useRef(false);
@@ -65,6 +78,12 @@ export default function VideoMeetComponent() {
     iceServers: defaultIceServers,
     iceCandidatePoolSize: 10,
   });
+
+  const meetingStartTimeRef = useRef(Date.now());
+  const mediaRecorderRef = useRef(null);
+  const speechRecognitionRef = useRef(null);
+  const isListeningRef = useRef(false);
+  const roomCodeRef = useRef("");
 
   const [videoAvailable, setVideoAvailable] = useState(false);
   const [audioAvailable, setAudioAvailable] = useState(false);
@@ -80,10 +99,23 @@ export default function VideoMeetComponent() {
   const [username, setUsername] = useState("");
   const [videos, setVideos] = useState([]);
 
+  // Phase 2 AI Transcription & Live Captions States
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(true);
+  const [transcripts, setTranscripts] = useState([]);
+  const [liveCaption, setLiveCaption] = useState(null);
+
   // Auto-scroll chat to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Auto-scroll transcript to bottom
+  useEffect(() => {
+    transcriptsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcripts]);
 
   // Synthetic track helpers for headless/no-device environments
   const createSilenceAudioTrack = () => {
@@ -147,7 +179,15 @@ export default function VideoMeetComponent() {
     }
 
     return () => {
-      // Clean up all tracks and connections on unmount
+      // Clean up all tracks, recording, and connections on unmount
+      if (mediaRecorderRef.current) {
+        try {
+          if (mediaRecorderRef.current.state !== "inactive") {
+            mediaRecorderRef.current.stop();
+          }
+        } catch (e) {}
+        mediaRecorderRef.current = null;
+      }
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach((track) => track.stop());
         screenStreamRef.current = null;
@@ -166,6 +206,7 @@ export default function VideoMeetComponent() {
         socketRef.current.disconnect();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getPermissions = async () => {
@@ -298,6 +339,7 @@ export default function VideoMeetComponent() {
 
   const connect = () => {
     setAskForUsername(false);
+    setShowConsentModal(true);
     connectToSocketServer();
   };
 
@@ -324,10 +366,37 @@ export default function VideoMeetComponent() {
     socketRef.current.on("signal", gotMessageFromServer);
 
     socketRef.current.on("connect", () => {
+      try {
+        const clean = window.location.pathname.split("/").filter(Boolean).pop();
+        roomCodeRef.current = (clean || "").toUpperCase();
+      } catch (e) {}
+
       socketRef.current.emit("join-call", window.location.href);
       socketIdRef.current = socketRef.current.id;
 
       socketRef.current.on("chat-message", addMessage);
+
+      // Real-time AI transcription listeners
+      socketRef.current.on("transcript-update", (entry) => {
+        setTranscripts((prev) => [...prev, entry]);
+        setLiveCaption(entry);
+        setTimeout(() => {
+          setLiveCaption((curr) =>
+            curr && (curr.id === entry.id || curr._id === entry._id) ? null : curr
+          );
+        }, 5000);
+      });
+
+      socketRef.current.on("transcript-history", (history) => {
+        if (Array.isArray(history)) {
+          setTranscripts(history);
+        }
+      });
+
+      socketRef.current.on("transcript-cleared", () => {
+        setTranscripts([]);
+        setLiveCaption(null);
+      });
 
       socketRef.current.on("user-left", (id) => {
         if (connections[id]) {
@@ -523,7 +592,205 @@ export default function VideoMeetComponent() {
       const nextState = !audioTrack.enabled;
       audioTrack.enabled = nextState;
       setAudio(nextState);
+
+      if (nextState && consentGiven) {
+        startAudioRecording();
+      } else {
+        stopAudioRecording();
+      }
     }
+  };
+
+  // Web Speech API: Real-time speech-to-text recognition directly in the browser
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    try {
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.stop(); } catch (e) {}
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event) => {
+        let interimText = "";
+        let finalText = "";
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript;
+          } else {
+            interimText += event.results[i][0].transcript;
+          }
+        }
+
+        const speakerName = username || "You";
+
+        if (interimText.trim()) {
+          setLiveCaption({
+            speaker: speakerName,
+            text: interimText.trim(),
+            isInterim: true,
+          });
+        }
+
+        if (finalText.trim() && socketRef.current?.connected) {
+          const clean = finalText.trim();
+          const now = (Date.now() - meetingStartTimeRef.current) / 1000;
+          socketRef.current.emit("audio-chunk", {
+            text: clean,
+            startTime: Math.max(0, now - 3),
+            endTime: now,
+          });
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error !== "no-speech") {
+          console.warn("Speech recognition notice:", e.error);
+        }
+      };
+
+      recognition.onend = () => {
+        if (isListeningRef.current) {
+          try {
+            recognition.start();
+          } catch (err) {}
+        }
+      };
+
+      recognition.start();
+      speechRecognitionRef.current = recognition;
+      isListeningRef.current = true;
+    } catch (err) {
+      console.warn("Speech recognition error:", err);
+    }
+  };
+
+  const stopSpeechRecognition = () => {
+    isListeningRef.current = false;
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
+    }
+  };
+
+  // Phase 2 AI Transcription & Speech Capture
+  const startAudioRecording = () => {
+    const stream = localStreamRef.current || window.localStream;
+    if (!stream) return;
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack || !audioTrack.enabled) return;
+
+    // Start Web Speech API for instant words
+    startSpeechRecognition();
+
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        return;
+      }
+
+      const audioOnlyStream = new MediaStream([audioTrack]);
+      let mimeType = "audio/webm;codecs=opus";
+      if (typeof MediaRecorder !== "undefined" && !MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      }
+
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(audioOnlyStream, options);
+      mediaRecorderRef.current = recorder;
+
+      let chunkStartTime = (Date.now() - meetingStartTimeRef.current) / 1000;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0 && socketRef.current?.connected) {
+          const chunkEndTime = (Date.now() - meetingStartTimeRef.current) / 1000;
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Data = reader.result ? reader.result.toString().split(",")[1] : null;
+            if (base64Data && socketRef.current) {
+              socketRef.current.emit("audio-chunk", {
+                audioBase64: base64Data,
+                startTime: chunkStartTime,
+                endTime: chunkEndTime,
+              });
+            }
+          };
+          reader.readAsDataURL(event.data);
+          chunkStartTime = chunkEndTime;
+        }
+      };
+
+      recorder.start(4000);
+    } catch (err) {
+      console.warn("MediaRecorder audio capture initialization:", err);
+    }
+  };
+
+  const stopAudioRecording = () => {
+    stopSpeechRecognition();
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {}
+      mediaRecorderRef.current = null;
+    }
+  };
+
+  const formatTimeOffset = (seconds) => {
+    if (typeof seconds !== "number" || isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleDownloadTranscript = () => {
+    if (!transcripts || transcripts.length === 0) return;
+    const room = roomCodeRef.current || "MEETING";
+    let content = `MEETZY AI MEETING TRANSCRIPT\nRoom Code: ${room}\nGenerated: ${new Date().toISOString()}\nTotal Segments: ${transcripts.length}\n${"-".repeat(45)}\n\n`;
+
+    transcripts.forEach((item) => {
+      const timeStr = formatTimeOffset(item.startTime);
+      content += `[${timeStr}] ${item.speaker || "Speaker"}:\n${item.text}\n\n`;
+    });
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `meetzy-transcript-${room}-${Date.now()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearTranscript = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete the transcript for this meeting?")) {
+      return;
+    }
+    const room = roomCodeRef.current;
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("transcript-clear");
+    }
+    if (typeof deleteTranscript === "function" && room) {
+      try {
+        await deleteTranscript(room);
+      } catch (e) {
+        console.warn("Delete transcript API error:", e);
+      }
+    }
+    setTranscripts([]);
+    setLiveCaption(null);
   };
 
   // Camera On / Off: toggles video track.enabled on localStream
@@ -627,6 +894,7 @@ export default function VideoMeetComponent() {
   };
 
   const handleEndCall = () => {
+    stopAudioRecording();
     stopScreenShare();
     try {
       const stream = localStreamRef.current || window.localStream;
@@ -671,6 +939,355 @@ export default function VideoMeetComponent() {
         </div>
       ) : (
         <div className={styles.meetVideoContainer}>
+          {/* AI Transcription Notice & Status Indicator */}
+          <Box
+            sx={{
+              position: "fixed",
+              top: 16,
+              left: 16,
+              zIndex: 100,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}>
+            {consentGiven ? (
+              <Chip
+                icon={
+                  <FiberManualRecordIcon
+                    sx={{
+                      fontSize: "14px !important",
+                      color: "#ef4444 !important",
+                      animation: "pulse 1.5s infinite",
+                      "@keyframes pulse": {
+                        "0%": { opacity: 1, transform: "scale(1)" },
+                        "50%": { opacity: 0.3, transform: "scale(1.2)" },
+                        "100%": { opacity: 1, transform: "scale(1)" },
+                      },
+                    }}
+                  />
+                }
+                label="AI Transcribing"
+                size="small"
+                sx={{
+                  background: "rgba(15, 23, 42, 0.85)",
+                  backdropFilter: "blur(8px)",
+                  color: "#f8fafc",
+                  border: "1px solid rgba(239, 68, 68, 0.5)",
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  px: 0.5,
+                }}
+              />
+            ) : (
+              <Chip
+                label="AI Transcribe: Opted Out"
+                size="small"
+                onClick={() => setShowConsentModal(true)}
+                sx={{
+                  background: "rgba(15, 23, 42, 0.85)",
+                  backdropFilter: "blur(8px)",
+                  color: "#94a3b8",
+                  border: "1px solid rgba(148, 163, 184, 0.25)",
+                  fontWeight: 500,
+                  fontSize: "0.75rem",
+                  cursor: "pointer",
+                  "&:hover": {
+                    borderColor: "#6366f1",
+                    color: "#f8fafc",
+                  },
+                }}
+              />
+            )}
+          </Box>
+
+          {/* Live Subtitles / Caption Overlay (Google Meet / Zoom style) */}
+          {showCaptions && liveCaption && (
+            <Box
+              sx={{
+                position: "fixed",
+                bottom: 84,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 100,
+                maxWidth: "80vw",
+                pointerEvents: "none",
+                animation: "fadeIn 0.2s ease-in-out",
+                "@keyframes fadeIn": {
+                  from: { opacity: 0, transform: "translate(-50%, 8px)" },
+                  to: { opacity: 1, transform: "translate(-50%, 0)" },
+                },
+              }}>
+              <Paper
+                elevation={8}
+                sx={{
+                  px: 3,
+                  py: 1.25,
+                  borderRadius: 3,
+                  background: "rgba(15, 23, 42, 0.90)",
+                  backdropFilter: "blur(14px)",
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  color: "white",
+                  textAlign: "center",
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
+                }}>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    fontSize: "1.05rem",
+                    fontWeight: 500,
+                    letterSpacing: "0.015em",
+                    lineHeight: 1.45,
+                  }}>
+                  <strong style={{ color: "#a5b4fc", marginRight: 10 }}>
+                    {liveCaption.speaker}:
+                  </strong>
+                  <span style={{ fontStyle: liveCaption.isInterim ? "italic" : "normal" }}>
+                    "{liveCaption.text}"
+                  </span>
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+
+          {/* Transcript Sidebar Drawer */}
+          {showTranscript && (
+            <Box
+              sx={{
+                position: "fixed",
+                top: 0,
+                right: showModal ? "350px" : 0,
+                width: "360px",
+                height: "100vh",
+                zIndex: 999,
+                animation: "slideInRight 0.3s ease-out",
+                "@keyframes slideInRight": {
+                  "0%": { opacity: 0, transform: "translateX(100%)" },
+                  "100%": { opacity: 1, transform: "translateX(0)" },
+                },
+              }}>
+              <Paper
+                elevation={8}
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  borderRadius: showModal ? 0 : "12px 0 0 12px",
+                  background: "rgba(255, 255, 255, 0.98)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255, 255, 255, 0.3)",
+                  borderRight: showModal ? "1px solid #e2e8f0" : "none",
+                  overflow: "hidden",
+                }}>
+                {/* Transcript Header */}
+                <Box
+                  sx={{
+                    background:
+                      "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)",
+                    color: "white",
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <ClosedCaptionIcon sx={{ color: "#a5b4fc" }} />
+                    <Typography variant="h6" fontWeight="600" fontSize="1.05rem">
+                      Live Transcript
+                    </Typography>
+                    <Chip
+                      label={`${transcripts.length}`}
+                      size="small"
+                      sx={{
+                        background: "rgba(255,255,255,0.2)",
+                        color: "white",
+                        height: 20,
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                      }}
+                    />
+                  </Box>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Tooltip title="Download Transcript (.txt)">
+                      <span>
+                        <IconButton
+                          onClick={handleDownloadTranscript}
+                          size="small"
+                          sx={{ color: "white" }}
+                          disabled={transcripts.length === 0}>
+                          <DownloadIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="Clear & Delete Transcript">
+                      <span>
+                        <IconButton
+                          onClick={handleClearTranscript}
+                          size="small"
+                          sx={{ color: "#fca5a5" }}
+                          disabled={transcripts.length === 0}>
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <IconButton
+                      onClick={() => setShowTranscript(false)}
+                      size="small"
+                      sx={{ color: "white" }}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </Box>
+
+                {/* Transcript Body */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    p: 2,
+                    overflowY: "auto",
+                    background:
+                      "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
+                  }}>
+                  {transcripts.length === 0 ? (
+                    <Box
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "grey.500",
+                        p: 3,
+                        textAlign: "center",
+                      }}>
+                      <ClosedCaptionIcon sx={{ fontSize: 44, mb: 1.5, opacity: 0.4 }} />
+                      <Typography variant="body2" fontWeight={500}>
+                        No speech transcribed yet
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5 }}>
+                        {consentGiven
+                          ? "Speak into your mic — AI will transcribe each speaker automatically."
+                          : "AI transcription is currently opted out. Click the top indicator to consent."}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    transcripts.map((item, idx) => (
+                      <Box key={item._id || item.id || idx} sx={{ mb: 2 }}>
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          mb={0.5}>
+                          <Box display="flex" alignItems="center" gap={0.75}>
+                            <Avatar
+                              sx={{
+                                width: 22,
+                                height: 22,
+                                fontSize: "0.65rem",
+                                bgcolor:
+                                  item.speaker === username
+                                    ? "#4f46e5"
+                                    : "#0d9488",
+                              }}>
+                              {item.speaker?.charAt(0)?.toUpperCase() || "A"}
+                            </Avatar>
+                            <Typography
+                              variant="caption"
+                              fontWeight={600}
+                              color="text.primary">
+                              {item.speaker === username ? "You" : item.speaker}
+                            </Typography>
+                          </Box>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontSize="0.7rem">
+                            {formatTimeOffset(item.startTime)}
+                          </Typography>
+                        </Box>
+                        <Paper
+                          elevation={1}
+                          sx={{
+                            p: 1.25,
+                            borderRadius: 2,
+                            background: "white",
+                            border: "1px solid rgba(0,0,0,0.06)",
+                          }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ lineHeight: 1.45, color: "#1e293b" }}>
+                            {item.text}
+                          </Typography>
+                        </Paper>
+                      </Box>
+                    ))
+                  )}
+                  <div ref={transcriptsEndRef} />
+                </Box>
+              </Paper>
+            </Box>
+          )}
+
+          {/* AI Transcription & Recording Consent Modal */}
+          <Dialog
+            open={showConsentModal}
+            onClose={() => setShowConsentModal(false)}
+            maxWidth="xs"
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                p: 1,
+                background: "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
+              },
+            }}>
+            <DialogTitle sx={{ fontWeight: 700, pb: 1, color: "#1e1b4b" }}>
+              AI Transcription Notice
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText sx={{ color: "#475569", fontSize: "0.9rem", mb: 1.5 }}>
+                Meetzy includes automated AI audio transcription powered by Whisper. Each participant's microphone audio is analyzed to generate live captions and speaker-attributed meeting transcripts.
+              </DialogContentText>
+              <DialogContentText sx={{ color: "#64748b", fontSize: "0.82rem" }}>
+                Under privacy regulations, all participants must provide consent before audio streaming begins. You can opt out at any time or request deletion of saved transcripts.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2, display: "flex", gap: 1 }}>
+              <Button
+                onClick={() => {
+                  setConsentGiven(false);
+                  setShowConsentModal(false);
+                  stopAudioRecording();
+                }}
+                variant="outlined"
+                color="inherit"
+                sx={{ textTransform: "none", borderRadius: 2 }}>
+                Opt Out
+              </Button>
+              <Button
+                onClick={() => {
+                  setConsentGiven(true);
+                  setShowConsentModal(false);
+                  startAudioRecording();
+                }}
+                variant="contained"
+                sx={{
+                  background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                  color: "white",
+                  textTransform: "none",
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  "&:hover": {
+                    background: "linear-gradient(135deg, #4338ca, #6d28d9)",
+                  },
+                }}>
+                I Consent & Enable AI
+              </Button>
+            </DialogActions>
+          </Dialog>
+
           {/* Chat Sidebar */}
           {showModal && (
             <Box
@@ -941,9 +1558,10 @@ export default function VideoMeetComponent() {
           <div className={styles.buttonContainers}>
             <IconButton
               onClick={handleVideo}
-              style={{ color: video ? "white" : "#ef4444" }}
-              title={video ? "Turn Camera Off" : "Turn Camera On"}>
-              {video ? <VideocamIcon /> : <VideocamOffIcon />}
+              disabled={!videoAvailable}
+              style={{ color: video && videoAvailable ? "white" : "#ef4444" }}
+              title={!videoAvailable ? "No Camera Detected" : (video ? "Turn Camera Off" : "Turn Camera On")}>
+              {video && videoAvailable ? <VideocamIcon /> : <VideocamOffIcon />}
             </IconButton>
 
             <IconButton
@@ -955,9 +1573,10 @@ export default function VideoMeetComponent() {
 
             <IconButton
               onClick={handleAudio}
-              style={{ color: audio ? "white" : "#ef4444" }}
-              title={audio ? "Mute Microphone" : "Unmute Microphone"}>
-              {audio ? <MicIcon /> : <MicOffIcon />}
+              disabled={!audioAvailable}
+              style={{ color: audio && audioAvailable ? "white" : "#ef4444" }}
+              title={!audioAvailable ? "No Microphone Detected" : (audio ? "Mute Microphone" : "Unmute Microphone")}>
+              {audio && audioAvailable ? <MicIcon /> : <MicOffIcon />}
             </IconButton>
 
             {screenAvailable && (
@@ -980,6 +1599,13 @@ export default function VideoMeetComponent() {
                 <ChatIcon />
               </IconButton>
             </Badge>
+
+            <IconButton
+              onClick={() => setShowCaptions((prev) => !prev)}
+              style={{ color: showCaptions ? "#818cf8" : "rgba(255,255,255,0.4)" }}
+              title={showCaptions ? "Turn Off Live Captions (CC)" : "Turn On Live Captions (CC)"}>
+              {showCaptions ? <ClosedCaptionIcon /> : <ClosedCaptionOffIcon />}
+            </IconButton>
           </div>
 
           {/* Local Video */}
