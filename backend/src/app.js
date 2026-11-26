@@ -2,7 +2,6 @@ import express from "express";
 import { createServer } from "node:http";
 
 import { Server } from "socket.io";
-import dotenv from "dotenv";
 
 import mongoose from "mongoose";
 import { connectToSocket } from "./controllers/socketManager.js";
@@ -10,7 +9,19 @@ import { connectToSocket } from "./controllers/socketManager.js";
 import cors from "cors";
 import userRoutes from "./routes/users.routes.js";
 
-dotenv.config();
+// Native .env loader with graceful fallback
+if (typeof process.loadEnvFile === "function") {
+    try {
+        process.loadEnvFile();
+    } catch (e) {
+        // .env file is optional if env vars are supplied by host
+    }
+} else {
+    try {
+        const dotenv = await import("dotenv");
+        dotenv.default?.config?.();
+    } catch (e) {}
+}
 
 const app = express();
 const server = createServer(app);
