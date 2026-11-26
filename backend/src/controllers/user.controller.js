@@ -69,20 +69,34 @@ const register = async (req, res) => {
 const getUserHistory = async (req, res) => {
     const { token } = req.query;
 
+    if (!token || typeof token !== "string" || !token.trim()) {
+        return res.status(httpStatus.UNAUTHORIZED).json({ message: "Unauthorized" });
+    }
+
     try {
-        const user = await User.findOne({ token: token });
+        const user = await User.findOne({ token: token.trim() });
+        if (!user) {
+            return res.status(httpStatus.UNAUTHORIZED).json({ message: "Unauthorized" });
+        }
         const meetings = await Meeting.find({ user_id: user.username })
         res.json(meetings)
     } catch (e) {
-        res.json({ message: `Something went wrong ${e}` })
+        res.status(500).json({ message: `Something went wrong ${e}` })
     }
 }
 
 const addToHistory = async (req, res) => {
     const { token, meeting_code } = req.body;
 
+    if (!token || typeof token !== "string" || !token.trim()) {
+        return res.status(httpStatus.UNAUTHORIZED).json({ message: "Unauthorized" });
+    }
+
     try {
-        const user = await User.findOne({ token: token });
+        const user = await User.findOne({ token: token.trim() });
+        if (!user) {
+            return res.status(httpStatus.UNAUTHORIZED).json({ message: "Unauthorized" });
+        }
 
         const newMeeting = new Meeting({
             user_id: user.username,
@@ -93,7 +107,7 @@ const addToHistory = async (req, res) => {
 
         res.status(httpStatus.CREATED).json({ message: "Added code to history" })
     } catch (e) {
-        res.json({ message: `Something went wrong ${e}` })
+        res.status(500).json({ message: `Something went wrong ${e}` })
     }
 }
 
