@@ -268,7 +268,24 @@ export default function VideoMeetComponent() {
   };
 
   const connectToSocketServer = () => {
-    socketRef.current = io.connect(server_url, { secure: false });
+    const token = localStorage.getItem("token");
+    socketRef.current = io.connect(server_url, {
+      secure: false,
+      auth: { token },
+      query: { token },
+    });
+
+    socketRef.current.on("connect_error", (err) => {
+      console.error("Socket authentication failed:", err.message);
+      alert("Authentication error: " + (err.message || "Please log in"));
+      window.location.href = "/auth";
+    });
+
+    socketRef.current.on("join-error", (data) => {
+      console.error("Join call rejected:", data.message);
+      alert(data.message || "Failed to join room.");
+      window.location.href = "/home";
+    });
 
     socketRef.current.on("signal", gotMessageFromServer);
 
@@ -445,7 +462,7 @@ export default function VideoMeetComponent() {
 
   const sendMessage = () => {
     if (socketRef.current && message.trim()) {
-      socketRef.current.emit("chat-message", message, username);
+      socketRef.current.emit("chat-message", message.trim());
       setMessage("");
     }
   };

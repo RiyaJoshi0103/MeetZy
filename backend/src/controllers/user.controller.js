@@ -112,4 +112,43 @@ const addToHistory = async (req, res) => {
 }
 
 
-export { login, register, getUserHistory, addToHistory }
+const createMeeting = async (req, res) => {
+    const { token, meeting_code } = req.body;
+
+    if (!token || typeof token !== "string" || !token.trim()) {
+        return res.status(httpStatus.UNAUTHORIZED).json({ message: "Token is required" });
+    }
+
+    try {
+        const user = await User.findOne({ token: token.trim() });
+        if (!user) {
+            return res.status(httpStatus.UNAUTHORIZED).json({ message: "Unauthorized" });
+        }
+
+        const code = (meeting_code && typeof meeting_code === "string" && meeting_code.trim())
+            ? meeting_code.trim().toUpperCase()
+            : crypto.randomBytes(4).toString("hex").toUpperCase();
+
+        const existing = await Meeting.findOne({ meetingCode: code });
+        if (existing) {
+            return res.status(httpStatus.OK).json({ meetingCode: code, message: "Meeting already exists" });
+        }
+
+        const newMeeting = new Meeting({
+            user_id: user.username,
+            meetingCode: code,
+            date: new Date()
+        });
+
+        await newMeeting.save();
+
+        return res.status(httpStatus.CREATED).json({
+            meetingCode: code,
+            message: "Meeting created successfully"
+        });
+    } catch (e) {
+        return res.status(500).json({ message: `Something went wrong ${e}` });
+    }
+};
+
+export { login, register, getUserHistory, addToHistory, createMeeting }

@@ -18,17 +18,23 @@ import { AuthContext } from "../contexts/AuthContext";
 function HomeComponent() {
   let navigate = useNavigate();
   const [meetingCode, setMeetingCode] = useState("");
-  const { addToUserHistory } = useContext(AuthContext);
+  const { addToUserHistory, createMeeting } = useContext(AuthContext);
 
   let handleJoinVideoCall = async () => {
     if (!meetingCode.trim()) return;
-    await addToUserHistory(meetingCode);
-    navigate(`/${meetingCode}`);
+    await addToUserHistory(meetingCode.trim().toUpperCase());
+    navigate(`/${meetingCode.trim().toUpperCase()}`);
   };
 
-  const handleCreateNewMeeting = () => {
-    const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setMeetingCode(randomCode);
+  const handleCreateNewMeeting = async () => {
+    try {
+      const res = await createMeeting();
+      if (res && res.meetingCode) {
+        setMeetingCode(res.meetingCode);
+      }
+    } catch (err) {
+      console.error("Failed to create new meeting:", err);
+    }
   };
 
   return (
