@@ -44,6 +44,11 @@ export const connectToSocket = (server) => {
                 return next(new Error("Authentication error: Invalid or expired token"));
             }
 
+            // Enforce token expiration
+            if (user.tokenExpires && user.tokenExpires < new Date()) {
+                return next(new Error("Authentication error: Session token has expired. Please log in again."));
+            }
+
             // Attach authenticated user identity to socket
             socket.user = {
                 id: user._id,

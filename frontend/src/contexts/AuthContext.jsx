@@ -11,6 +11,15 @@ const client = axios.create({
     baseURL: `${server}/api/v1/users`
 })
 
+// Attach Bearer token in headers for all authenticated requests
+client.interceptors.request.use((config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
 
 export const AuthProvider = ({ children }) => {
 
@@ -121,9 +130,18 @@ export const AuthProvider = ({ children }) => {
         ];
     }
 
+    const handleLogout = async () => {
+        try {
+            await client.post("/logout");
+        } catch (e) {}
+        localStorage.removeItem("token");
+        setUserData(null);
+        router("/auth");
+    };
+
 
     const data = {
-        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin
+        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin, handleLogout
     }
 
     return (

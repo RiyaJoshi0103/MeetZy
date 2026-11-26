@@ -18,7 +18,7 @@ import { AuthContext } from "../contexts/AuthContext";
 function HomeComponent() {
   let navigate = useNavigate();
   const [meetingCode, setMeetingCode] = useState("");
-  const { addToUserHistory, createMeeting } = useContext(AuthContext);
+  const { addToUserHistory, createMeeting, handleLogout } = useContext(AuthContext);
 
   let handleJoinVideoCall = async () => {
     if (!meetingCode.trim()) return;
@@ -82,10 +82,7 @@ function HomeComponent() {
               </Typography>
 
               <Button
-                onClick={() => {
-                  localStorage.removeItem("token");
-                  navigate("/auth");
-                }}
+                onClick={handleLogout}
                 startIcon={<LogoutIcon />}
                 sx={{
                   color: "white",
