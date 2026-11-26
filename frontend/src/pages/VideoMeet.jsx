@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useContext } from "react";
 import io from "socket.io-client";
 import {
   Badge,
@@ -22,17 +22,35 @@ import ChatIcon from "@mui/icons-material/Chat";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
 import server from "../environment";
+import { AuthContext } from "../contexts/AuthContext";
 
 const server_url = server;
 
 // Active WebRTC peer connections keyed by remote socketId
 const connections = {};
 
-const peerConfigConnections = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-};
+const defaultIceServers = [
+  {
+    urls: [
+      "stun:stun.l.google.com:19302",
+      "stun:stun1.l.google.com:19302",
+      "stun:stun2.l.google.com:19302",
+    ],
+  },
+  {
+    urls: [
+      "turn:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:443",
+      "turn:openrelay.metered.ca:443?transport=tcp",
+    ],
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
+];
 
 export default function VideoMeetComponent() {
+  const { getIceServers } = useContext(AuthContext);
+
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
   const localVideoref = useRef(null);
@@ -42,6 +60,11 @@ export default function VideoMeetComponent() {
   const isScreenSharingRef = useRef(false);
   const hasInitializedMedia = useRef(false);
   const videoRef = useRef([]);
+
+  const peerConfigRef = useRef({
+    iceServers: defaultIceServers,
+    iceCandidatePoolSize: 10,
+  });
 
   const [videoAvailable, setVideoAvailable] = useState(false);
   const [audioAvailable, setAudioAvailable] = useState(false);
@@ -110,6 +133,17 @@ export default function VideoMeetComponent() {
     if (!hasInitializedMedia.current) {
       hasInitializedMedia.current = true;
       getPermissions();
+
+      if (typeof getIceServers === "function") {
+        getIceServers().then((servers) => {
+          if (servers && Array.isArray(servers) && servers.length > 0) {
+            peerConfigRef.current = {
+              iceServers: servers,
+              iceCandidatePoolSize: 10,
+            };
+          }
+        });
+      }
     }
 
     return () => {
@@ -313,11 +347,15 @@ export default function VideoMeetComponent() {
           // Do not recreate existing peer connection for users already connected
           if (connections[socketListId]) return;
 
-          const pc = new RTCPeerConnection(peerConfigConnections);
+          const pc = new RTCPeerConnection(peerConfigRef.current);
           connections[socketListId] = pc;
 
           pc.onicecandidate = (event) => {
             if (event.candidate != null && socketRef.current) {
+              const candStr = event.candidate.candidate || "";
+              if (candStr.includes("typ relay")) {
+                console.log(`[TURN] Relay candidate gathered for peer ${socketListId}`);
+              }
               socketRef.current.emit(
                 "signal",
                 socketListId,
@@ -387,11 +425,15 @@ export default function VideoMeetComponent() {
     if (fromId === socketIdRef.current) return;
 
     if (!connections[fromId]) {
-      const pc = new RTCPeerConnection(peerConfigConnections);
+      const pc = new RTCPeerConnection(peerConfigRef.current);
       connections[fromId] = pc;
 
       pc.onicecandidate = (event) => {
         if (event.candidate != null && socketRef.current) {
+          const candStr = event.candidate.candidate || "";
+          if (candStr.includes("typ relay")) {
+            console.log(`[TURN] Relay candidate gathered for peer ${fromId}`);
+          }
           socketRef.current.emit(
             "signal",
             fromId,

@@ -93,9 +93,37 @@ export const AuthProvider = ({ children }) => {
         }
     }
 
+    const getIceServers = async () => {
+        try {
+            let request = await client.get("/get_ice_servers");
+            if (request.data && Array.isArray(request.data.iceServers)) {
+                return request.data.iceServers;
+            }
+        } catch (e) {}
+
+        // Safe fallback including STUN and OpenRelay TURN
+        return [
+            {
+                urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                ],
+            },
+            {
+                urls: [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turn:openrelay.metered.ca:443?transport=tcp",
+                ],
+                username: "openrelayproject",
+                credential: "openrelayproject",
+            },
+        ];
+    }
+
 
     const data = {
-        userData, setUserData, addToUserHistory, createMeeting, getHistoryOfUser, handleRegister, handleLogin
+        userData, setUserData, addToUserHistory, createMeeting, getIceServers, getHistoryOfUser, handleRegister, handleLogin
     }
 
     return (

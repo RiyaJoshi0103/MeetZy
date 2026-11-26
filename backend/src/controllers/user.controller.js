@@ -151,4 +151,45 @@ const createMeeting = async (req, res) => {
     }
 };
 
-export { login, register, getUserHistory, addToHistory, createMeeting }
+const getIceServers = async (req, res) => {
+    try {
+        const iceServers = [
+            {
+                urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                    "stun:stun2.l.google.com:19302",
+                ],
+            },
+        ];
+
+        const turnUrls = process.env.TURN_URLS;
+        const turnUsername = process.env.TURN_USERNAME;
+        const turnCredential = process.env.TURN_CREDENTIAL;
+
+        if (turnUrls && turnUsername && turnCredential) {
+            iceServers.push({
+                urls: turnUrls.split(",").map((u) => u.trim()),
+                username: turnUsername,
+                credential: turnCredential,
+            });
+        } else {
+            // Default free TURN relay for NAT/firewall traversal
+            iceServers.push({
+                urls: [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turn:openrelay.metered.ca:443?transport=tcp",
+                ],
+                username: "openrelayproject",
+                credential: "openrelayproject",
+            });
+        }
+
+        return res.json({ iceServers });
+    } catch (e) {
+        return res.status(500).json({ message: "Failed to retrieve ICE servers" });
+    }
+};
+
+export { login, register, getUserHistory, addToHistory, createMeeting, getIceServers }
